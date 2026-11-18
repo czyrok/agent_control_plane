@@ -20,7 +20,7 @@ variable "mcp_service_name" {
 
 variable "internal_service_name" {
   type        = string
-  description = "Name of the Service exposing the internal API to the gatekeeper and the dashboard"
+  description = "Name of the Service exposing the internal API to the dashboard"
 }
 
 variable "plane" {
@@ -61,9 +61,29 @@ variable "max_running_workspaces" {
   description = "Running workspaces above which no new work item is started"
 }
 
-variable "internal_client_pod_labels" {
-  type        = map(string)
-  description = "Labels of the pods in namespace_name allowed to call the internal API"
+variable "ntfy_url" {
+  type        = string
+  default     = ""
+  description = "URL of the ntfy server questions are published to; empty sends none"
+}
+
+variable "ntfy_topic" {
+  type        = string
+  default     = ""
+  description = "ntfy topic questions are published on"
+}
+
+variable "ntfy_token" {
+  type        = string
+  sensitive   = true
+  default     = ""
+  description = "ntfy access token allowed to publish on that topic"
+}
+
+variable "notification_email" {
+  type        = string
+  default     = ""
+  description = "Address ntfy also emails each question to. Empty sends no email"
 }
 
 variable "dashboard_namespace_name" {

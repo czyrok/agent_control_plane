@@ -1,36 +1,71 @@
 import { marked } from "marked"
+import { notifyQuestion } from "../infrastructure/ntfy.ts"
 import * as planeWorkItemRepository from "../repositories/plane-work-item-repository.ts"
 import { COMMENT_SOURCE } from "../repositories/plane-work-item-repository.ts"
 import * as questionRepository from "../repositories/question-repository.ts"
 import * as workItemWorkspaceRepository from "../repositories/work-item-workspace-repository.ts"
 import * as planeProjectService from "../services/plane-project-service.ts"
-import type { WorkItemWorkspace } from "../shared/types.ts"
+import { waitForAnswer, wakeWaiters } from "../services/question-waiter-service.ts"
+import type { Question, WorkItemWorkspace } from "../shared/types.ts"
 
-export type QuestionItem = { itemKey: string; itemName: string; url: string }
+type QuestionItem = { itemKey: string; itemName: string; url: string }
 
 function describeItem(link: WorkItemWorkspace): QuestionItem {
   return { itemKey: link.itemKey, itemName: link.itemName, url: planeProjectService.workItemUrl(link.itemKey) }
 }
 
-export async function postQuestion(id: string, workspace: string, question: string): Promise<QuestionItem | undefined> {
+export async function askOperator(
+  workspace: string,
+  question: string,
+  waitMilliseconds: number,
+): Promise<Question | undefined> {
   const link = workItemWorkspaceRepository.findByWorkspace(workspace)
   if (!link) return undefined
-  if (questionRepository.findById(id)) return describeItem(link)
+  const latest = questionRepository.findLatestByWorkspace(workspace)
+  if (latest && latest.answer === null) return waitForAnswer(latest.id, waitMilliseconds)
 
+  const id = crypto.randomUUID()
   const createdAt = new Date().toISOString()
   await planeWorkItemRepository.addComment(
     link.itemId,
     await marked.parse(`**Question from the agent**\n\n${question}`),
     id,
   )
-  questionRepository.insert({ id, itemId: link.itemId, workspace, createdAt, answer: null, answeredAt: null })
+  questionRepository.insert({
+    id,
+    itemId: link.itemId,
+    workspace,
+    createdAt,
+    answer: null,
+    answeredAt: null,
+    deliveredAt: null,
+  })
   await planeWorkItemRepository.setState(link.itemId, await planeProjectService.stateIdByKey("waiting"))
-  return describeItem(link)
+  const item = describeItem(link)
+  notifyQuestion({ itemKey: item.itemKey, itemName: item.itemName, url: item.url, question }).catch((error) =>
+    console.error(error),
+  )
+  return waitForAnswer(id, waitMilliseconds)
 }
 
-export function readQuestion(id: string): { answered: boolean; answer: string | null } | undefined {
-  const question = questionRepository.findById(id)
-  return question && { answered: question.answer !== null, answer: question.answer }
+export async function awaitAnswer(workspace: string, waitMilliseconds: number): Promise<Question | undefined> {
+  const latest = questionRepository.findLatestByWorkspace(workspace)
+  return latest && waitForAnswer(latest.id, waitMilliseconds)
+}
+
+export function takePendingAnswer(workspace: string): { id: string; itemKey: string; answer: string } | undefined {
+  const question = questionRepository.findOldestUndelivered(workspace)
+  if (!question?.answer) return undefined
+  return {
+    id: question.id,
+    itemKey: workItemWorkspaceRepository.findByItemId(question.itemId)?.itemKey ?? "",
+    answer: question.answer,
+  }
+}
+
+export function acknowledgeAnswer(workspace: string, id: string): void {
+  if (questionRepository.findById(id)?.workspace !== workspace) return
+  questionRepository.markDelivered(id)
 }
 
 export async function syncQuestionAnswers(): Promise<void> {
@@ -41,6 +76,7 @@ export async function syncQuestionAnswers(): Promise<void> {
     )
     if (!reply) continue
     questionRepository.setAnswer(question.id, reply.text)
+    wakeWaiters(question.id)
     await planeWorkItemRepository.setState(question.itemId, await planeProjectService.stateIdByKey("in_progress"))
   }
 }

@@ -56,6 +56,7 @@ resource "kubernetes_secret_v1" "agent_control_plane" {
 
   data = {
     plane_admin_password = var.plane_admin_password
+    ntfy_token           = var.ntfy_token
   }
 
   depends_on = [ var.wait_for ]
@@ -114,7 +115,7 @@ resource "kubernetes_deployment_v1" "agent_control_plane" {
         }
 
         annotations = {
-          secret_hash = sha256(var.plane_admin_password)
+          secret_hash = sha256(jsonencode([var.plane_admin_password, var.ntfy_token]))
         }
       }
 
@@ -245,6 +246,31 @@ resource "kubernetes_deployment_v1" "agent_control_plane" {
           env {
             name  = "MAX_RUNNING_WORKSPACES"
             value = tostring(var.max_running_workspaces)
+          }
+
+          env {
+            name  = "NTFY_URL"
+            value = var.ntfy_url
+          }
+
+          env {
+            name  = "NTFY_TOPIC"
+            value = var.ntfy_topic
+          }
+
+          env {
+            name = "NTFY_TOKEN"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret_v1.agent_control_plane.metadata[0].name
+                key  = "ntfy_token"
+              }
+            }
+          }
+
+          env {
+            name  = "NOTIFICATION_EMAIL"
+            value = var.notification_email
           }
 
           env {

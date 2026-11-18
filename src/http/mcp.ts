@@ -1,8 +1,9 @@
 import type { IncomingMessage, ServerResponse } from "node:http"
-import { env } from "../infrastructure/env.ts"
-import { findPodLabelsByIp } from "../infrastructure/kubernetes.ts"
+import type { Question } from "../shared/types.ts"
+import { askOperator, awaitAnswer } from "../use-cases/questions.ts"
 import { addWorkItemComment, finishWorkItem, getWorkItemContext } from "../use-cases/work-item-tools.ts"
 import { readBody, sendJson } from "./body.ts"
+import { identifyCaller } from "./caller.ts"
 
 type JsonRpcId = string | number | null
 
@@ -13,6 +14,9 @@ type JsonRpcMessage = {
 }
 
 const UNLINKED = "This workspace was not started from a Plane work item."
+const ASK_UNLINKED = "This workspace was not started from a Plane work item; ask the user in this session instead."
+
+const WAIT_MILLISECONDS = 25_000
 
 const TOOLS = [
   {
@@ -39,12 +43,28 @@ const TOOLS = [
       required: ["summary"],
     },
   },
+  {
+    name: "ask_operator",
+    description:
+      "Ask the operator what you cannot settle yourself. Posts it on your Plane work item, moves the item to Waiting and notifies them. Waits up to 25 s; if still pending, end your turn: the answer is typed into this session when it arrives.",
+    inputSchema: {
+      type: "object",
+      properties: { question: { type: "string", description: "Every open question, batched in one Markdown message" } },
+      required: ["question"],
+    },
+  },
+  {
+    name: "answer_status",
+    description: "Wait up to 25 s for the answer to your last ask_operator question.",
+    inputSchema: { type: "object", properties: {} },
+  },
 ]
 
-async function identifyWorkspace(ip: string): Promise<string | undefined> {
-  const labels = await findPodLabelsByIp(env("WORKSPACES_NAMESPACE"), ip).catch(() => undefined)
-  if (!labels?.["coder.workspace_name"]) return undefined
-  return `${labels["coder.workspace_owner"]}/${labels["coder.workspace_name"]}`
+function questionText(question: Question): string {
+  if (question.answer === null) {
+    return "Pending: the operator has been notified. End your turn now; the answer will arrive as your next message."
+  }
+  return `Answered: ${question.answer}`
 }
 
 function text(args: Record<string, unknown>, name: string): string {
@@ -73,6 +93,19 @@ async function callTool(
       if (!summary) return { text: "summary is empty", isError: true }
       result = await finishWorkItem(workspace, summary)
       break
+    }
+    case "ask_operator": {
+      const question = text(args, "question")
+      if (!question) return { text: "question is empty", isError: true }
+      const asked = await askOperator(workspace, question, WAIT_MILLISECONDS)
+      return { text: asked ? questionText(asked) : ASK_UNLINKED, isError: false }
+    }
+    case "answer_status": {
+      const latest = await awaitAnswer(workspace, WAIT_MILLISECONDS)
+      return {
+        text: latest ? questionText(latest) : "Unknown: no question was asked from this workspace.",
+        isError: false,
+      }
     }
     default:
       return { text: `Unknown tool: ${name}`, isError: true }
@@ -118,17 +151,8 @@ export async function handleMcp(request: IncomingMessage, response: ServerRespon
     response.writeHead(405, { Allow: "POST" }).end()
     return
   }
-  if (request.headers["x-forwarded-for"] !== undefined) {
-    sendJson(response, 403, { error: "MCP is served to workspaces only" })
-    return
-  }
-  const ip = (request.socket.remoteAddress ?? "").replace(/^::ffff:/, "")
-  const workspace = await identifyWorkspace(ip)
-  if (!workspace) {
-    console.warn(`mcp: no workspace pod has IP ${ip}`)
-    sendJson(response, 403, { error: "Not a workspace", ip })
-    return
-  }
+  const workspace = await identifyCaller(request, response, "MCP is served to workspaces only")
+  if (!workspace) return
 
   let message: JsonRpcMessage
   try {
