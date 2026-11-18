@@ -32,4 +32,5 @@ export type Question = {
   createdAt: string
   answer: string | null
   answeredAt: string | null
+  deliveredAt: string | null
 }

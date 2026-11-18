@@ -2,8 +2,8 @@
 
 Syncs Plane work items with Coder agent workspaces: starts a workspace for
 each ready item, writes the link back, stops it once the item is closed, and
-serves the agent's Plane tools over MCP. It is the only service holding a
-Plane API key.
+serves the agent's Plane tools and questions to the operator over MCP. It is
+the only service holding a Plane API key.
 
 ## Sync
 
@@ -37,20 +37,36 @@ Workspaces reach
 - `add_comment { body }` posts Markdown on the item.
 - `finish_work_item { summary }` posts the summary and moves the item to
   **Finished**.
+- `ask_operator { question }` comments the question on the item as
+  "Question from the agent", moves it to **Waiting**, publishes
+  `Question on <key>` to ntfy on `NTFY_TOPIC` (`agent-questions`) with a link
+  to the item, and waits up to 25 s for the answer.
+- `answer_status {}` waits up to 25 s more on the workspace's last question.
+
+A workspace holds one pending question at a time: asking again while one is
+pending waits on it instead. Questions never expire. The operator's first
+reply comment is the answer.
 
 The caller is identified as in the gatekeeper: the running pod whose IP is
 the TCP peer in `WORKSPACES_NAMESPACE`. A workspace not started from a work
-item gets a plain answer saying so.
+item gets a plain answer saying so; `ask_operator` tells it to ask in its
+session instead.
+
+## Answers
+
+The workspace delivers an answer into the agent's session itself, through
+`/answers/next` on the MCP port, served to workspace pods only:
+`GET` returns the oldest undelivered answer as text, with `X-Answer-Id` and
+`X-Item-Key`, or `204`; it serves the same answer until `POST` with that id as
+body acknowledges it.
 
 ## Internal API
 
 On `http://agent-control-plane.coder.svc.cluster.local` (port 4332), reached
-only by the gatekeeper's pods and the dashboard namespace:
+only by the dashboard namespace:
 
 | Request | Answer |
 | --- | --- |
-| `POST /questions {id, workspace, question}` | Comment on the item, state **Waiting**; `{itemKey, itemName, url}`, or `404` when the workspace has no item. Repeating an `id` posts nothing new |
-| `GET /questions/<id>` | `{answered, answer}` or `404` |
 | `GET /waiting` | `{items: [{name, url}]}` of unanswered questions |
 | `GET /health` | `ok` |
 
@@ -91,7 +107,7 @@ kubectl -n coder rollout restart deployment agent-control-plane
 
 | Variable | Value |
 | --- | --- |
-| `MCP_PORT` | Port serving only `/mcp`, `4331` |
+| `MCP_PORT` | Port serving only `/mcp` and `/answers/next`, `4331` |
 | `INTERNAL_PORT` | Port of the internal API, `4332` |
 | `DATABASE_PATH` | SQLite file, on the data volume |
 | `WORKSPACES_NAMESPACE` | Namespace of the workspace pods allowed on `/mcp` |
@@ -108,6 +124,10 @@ kubectl -n coder rollout restart deployment agent-control-plane
 | `CODER_ADMIN_PASSWORD` | Its password, from the same Secret |
 | `AGENT_REPOSITORIES` | JSON map of `Repository` label key to `owner/name` |
 | `MAX_RUNNING_WORKSPACES` | Running workspaces above which none starts, `2` |
+| `NTFY_URL` | ntfy server questions are published to; empty sends no notification |
+| `NTFY_TOPIC` | Its topic, `agent-questions` |
+| `NTFY_TOKEN` | ntfy token allowed to publish there |
+| `NOTIFICATION_EMAIL` | Address ntfy also emails; empty sends none |
 | `NODE_EXTRA_CA_CERTS` | The ServiceAccount `ca.crt`, to trust the API server |
 
 The Terraform module in `.terraform-module/` sets all of them.

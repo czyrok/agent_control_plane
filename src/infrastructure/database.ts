@@ -19,6 +19,14 @@ database.exec(`
     workspace TEXT NOT NULL,
     created_at TEXT NOT NULL,
     answer TEXT,
-    answered_at TEXT
+    answered_at TEXT,
+    delivered_at TEXT
   );
 `)
+
+const questionColumns = database.prepare("PRAGMA table_info(questions)").all() as { name: string }[]
+if (!questionColumns.some((column) => column.name === "delivered_at")) {
+  database.exec(
+    "ALTER TABLE questions ADD COLUMN delivered_at TEXT; UPDATE questions SET delivered_at = answered_at WHERE answer IS NOT NULL",
+  )
+}
