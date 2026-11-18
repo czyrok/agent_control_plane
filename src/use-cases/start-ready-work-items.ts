@@ -28,7 +28,8 @@ async function blockersDone(item: WorkItem, itemsById: Map<string, WorkItem>): P
 
 async function start(item: WorkItem, agent: string, itemsById: Map<string, WorkItem>): Promise<void> {
   const name = item.key.toLowerCase()
-  const branch = `${name}-${slug(item.name)}`.slice(0, BRANCH_MAX_LENGTH).replace(/-+$/, "")
+  const prefix = await planeProjectService.branchPrefixOf(item)
+  const branch = `${prefix}/${name}-${slug(item.name)}`.slice(0, BRANCH_MAX_LENGTH).replace(/-+$/, "")
   const workspace = await createWorkspace(name, await findTemplateId(env("CODER_TEMPLATE")), {
     repositories: JSON.stringify(await planeProjectService.repositoriesOf(item, itemsById)),
     base_branch: "main",

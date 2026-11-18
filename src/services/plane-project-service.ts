@@ -6,6 +6,15 @@ const CATALOG_LIFETIME_MILLISECONDS = 300_000
 
 const AGENTS: Record<string, string> = { "agent/claude_code": "claude-code", "agent/opencode": "opencode" }
 const SCOPES: Record<string, Scope> = { "scope/research": "research", "scope/spec": "spec" }
+const BRANCH_PREFIXES: Record<string, string> = {
+  "type/feature": "feat",
+  "type/fix": "fix",
+  "type/hotfix": "hotfix",
+  "type/refactor": "refactor",
+  "type/chore": "chore",
+  "type/docs": "docs",
+}
+const DEFAULT_BRANCH_PREFIX = "feat"
 const REPOSITORY_LABEL_PREFIX = "repository/"
 
 export type Scope = "research" | "spec"
@@ -49,6 +58,10 @@ export async function agentOf(item: WorkItem): Promise<string | undefined> {
 
 export async function scopeOf(item: WorkItem): Promise<Scope | undefined> {
   return (await externalLabelIds(item)).map((externalId) => SCOPES[externalId]).find(Boolean)
+}
+
+export async function branchPrefixOf(item: WorkItem): Promise<string> {
+  return (await externalLabelIds(item)).map((externalId) => BRANCH_PREFIXES[externalId]).find(Boolean) ?? DEFAULT_BRANCH_PREFIX
 }
 
 export async function labelNames(item: WorkItem): Promise<string[]> {
