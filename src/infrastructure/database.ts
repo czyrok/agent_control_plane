@@ -59,6 +59,9 @@ if (!questionColumns.some((column) => column.name === "delivered_at")) {
     "ALTER TABLE questions ADD COLUMN delivered_at TEXT; UPDATE questions SET delivered_at = answered_at WHERE answer IS NOT NULL",
   )
 }
+if (!questionColumns.some((column) => column.name === "superseded_at")) {
+  database.exec("ALTER TABLE questions ADD COLUMN superseded_at TEXT")
+}
 
 const linkColumns = new Set(
   (database.prepare("PRAGMA table_info(work_item_workspaces)").all() as { name: string }[]).map((column) => column.name),

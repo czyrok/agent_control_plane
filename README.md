@@ -89,9 +89,11 @@ Workspaces reach
   to the item, and waits up to 25 s for the answer.
 - `answer_status {}` waits up to 25 s more on the workspace's last question.
 
-A workspace holds one pending question at a time: asking again while one is
-pending waits on it instead. Questions never expire. The operator's first
-reply comment is the answer.
+A workspace holds one pending question at a time: asking again posts the new
+question, marked as replacing the previous one, which no longer waits for an
+answer nor shows in `/waiting`; a reply already posted to it is still
+delivered. Questions never expire. The operator's first reply comment is the
+answer.
 
 The caller is identified as in the gatekeeper: the running pod whose IP is
 the TCP peer in `WORKSPACES_NAMESPACE`. A workspace not started from a work
