@@ -1,6 +1,6 @@
 import { env } from "../infrastructure/env.ts"
-import { PlaneConflictError, planeRequest } from "../infrastructure/plane.ts"
-import type { PlaneComment, PlaneLabel, PlaneState, WorkItem } from "../shared/types.ts"
+import { PlaneConflictError, planeDownload, planeRequest } from "../infrastructure/plane.ts"
+import type { PlaneAttachment, PlaneComment, PlaneLabel, PlaneMember, PlaneState, WorkItem } from "../shared/types.ts"
 
 export const COMMENT_SOURCE = "agent-control-plane"
 const PROVISIONING_SOURCE = "lyre-terraform"
@@ -112,9 +112,19 @@ export function descendantsOf(itemId: string, items: WorkItem[]): WorkItem[] {
   return found
 }
 
-export async function listMemberEmails(): Promise<Map<string, string>> {
-  const members = await planeRequest<{ id: string; email: string }[]>("GET", `${workspacePath()}/members/`)
-  return new Map(members.map((member) => [member.id, member.email]))
+export async function listMembers(): Promise<Map<string, PlaneMember>> {
+  const members = await planeRequest<
+    { id: string; email: string; first_name?: string; last_name?: string; display_name?: string }[]
+  >("GET", `${workspacePath()}/members/`)
+  return new Map(
+    members.map((member) => [
+      member.id,
+      {
+        email: member.email,
+        name: `${member.first_name ?? ""} ${member.last_name ?? ""}`.trim() || member.display_name || member.email,
+      },
+    ]),
+  )
 }
 
 export async function listStates(): Promise<PlaneState[]> {
@@ -184,6 +194,29 @@ export async function addLink(itemId: string, url: string, title: string): Promi
   await planeRequest("POST", `${await projectPath()}/issues/${itemId}/links/`, { url, title })
 }
 
-export async function setState(itemId: string, stateId: string): Promise<void> {
-  await planeRequest("PATCH", `${await projectPath()}/issues/${itemId}/`, { state: stateId })
+export async function setState(itemId: string, stateId: string, labelIds?: string[]): Promise<void> {
+  await planeRequest("PATCH", `${await projectPath()}/issues/${itemId}/`, {
+    state: stateId,
+    ...(labelIds ? { labels: labelIds } : {}),
+  })
+}
+
+export async function listAttachments(itemId: string): Promise<PlaneAttachment[]> {
+  type Payload = { id: string; is_uploaded?: boolean; attributes: { name: string; size: number; type: string } }
+  const payload = await planeRequest<Payload[] | { results: Payload[] }>(
+    "GET",
+    `${await projectPath()}/issues/${itemId}/issue-attachments/`,
+  )
+  return (Array.isArray(payload) ? payload : payload.results)
+    .filter((attachment) => attachment.is_uploaded !== false)
+    .map((attachment) => ({
+      id: attachment.id,
+      name: attachment.attributes.name,
+      size: attachment.attributes.size,
+      mimeType: attachment.attributes.type,
+    }))
+}
+
+export async function downloadAttachment(itemId: string, attachmentId: string): Promise<Response> {
+  return planeDownload(`${await projectPath()}/issues/${itemId}/issue-attachments/${attachmentId}/`)
 }

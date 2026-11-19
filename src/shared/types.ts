@@ -16,6 +16,10 @@ export type PlaneLabel = { id: string; name: string; parentId: string | null; ex
 
 export type PlaneComment = { id: string; text: string; externalSource: string | null; createdAt: string }
 
+export type PlaneAttachment = { id: string; name: string; size: number; mimeType: string }
+
+export type PlaneMember = { email: string; name: string }
+
 export type WorkItemWorkspace = {
   itemId: string
   itemKey: string
@@ -29,6 +33,7 @@ export type WorkItemWorkspace = {
   currentGroup: number | null
   sessionRevision: number
   sessionPrompt: string
+  sessionModel: string
   syncedStateId: string | null
   deletedAt: string | null
 }
@@ -43,11 +48,12 @@ export type BatchGroup = {
   name: string
   skill: string
   instructions: string
+  model: string
   status: BatchGroupStatus
   memberIds: string[]
 }
 
-export type BatchGroupInput = { name: string; skill: string; instructions: string; items: string[] }
+export type BatchGroupInput = { name: string; skill: string; instructions: string; model: string; items: string[] }
 
 export type Question = {
   id: string

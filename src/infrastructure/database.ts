@@ -59,6 +59,9 @@ if (!questionColumns.some((column) => column.name === "delivered_at")) {
     "ALTER TABLE questions ADD COLUMN delivered_at TEXT; UPDATE questions SET delivered_at = answered_at WHERE answer IS NOT NULL",
   )
 }
+if (!questionColumns.some((column) => column.name === "superseded_at")) {
+  database.exec("ALTER TABLE questions ADD COLUMN superseded_at TEXT")
+}
 
 const linkColumns = new Set(
   (database.prepare("PRAGMA table_info(work_item_workspaces)").all() as { name: string }[]).map((column) => column.name),
@@ -69,8 +72,14 @@ for (const [column, definition] of [
   ["current_group", "INTEGER"],
   ["session_revision", "INTEGER NOT NULL DEFAULT 0"],
   ["session_prompt", "TEXT NOT NULL DEFAULT ''"],
+  ["session_model", "TEXT NOT NULL DEFAULT ''"],
   ["synced_state_id", "TEXT"],
   ["deleted_at", "TEXT"],
 ]) {
   if (!linkColumns.has(column)) database.exec(`ALTER TABLE work_item_workspaces ADD COLUMN ${column} ${definition}`)
 }
+
+const groupColumns = new Set(
+  (database.prepare("PRAGMA table_info(batch_groups)").all() as { name: string }[]).map((column) => column.name),
+)
+if (!groupColumns.has("model")) database.exec("ALTER TABLE batch_groups ADD COLUMN model TEXT NOT NULL DEFAULT ''")

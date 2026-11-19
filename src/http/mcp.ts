@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http"
 import { githubEnabled } from "../infrastructure/github.ts"
+import { CLAUDE_MODELS } from "../shared/models.ts"
 import type { BatchGroupInput, Question } from "../shared/types.ts"
 import { setBatchGroups } from "../use-cases/batch-groups.ts"
 import {
@@ -31,7 +32,7 @@ const TOOLS = [
   {
     name: "get_work_item",
     description:
-      "Read the Plane work item this workspace was started for: description, parents with their comments, children, blockers and comments. Call it first. Pass key (e.g. LYRE-12) to read one of its children or sub-children in full: description, children, blockers and comments.",
+      "Read the Plane work item this workspace was started for: description, parents with their comments, children, blockers and comments. Call it first. Pass key (e.g. LYRE-12) to read one of its children or sub-children in full: description, children, blockers and comments. Lists each item's attachments; download one with curl from the URL it gives.",
     inputSchema: {
       type: "object",
       properties: {
@@ -61,7 +62,7 @@ const TOOLS = [
   {
     name: "set_batch_groups",
     description:
-      "Planning session only: save the ordered batch groups the children of your work item run in, one session each. Calling it again replaces them.",
+      "Planning session only: save the ordered batch groups the children of your work item run in, one session each. Calling it again replaces them. Claude Code items need a model per group.",
     inputSchema: {
       type: "object",
       required: ["groups"],
@@ -73,6 +74,11 @@ const TOOLS = [
             required: ["name", "items"],
             properties: {
               name: { type: "string" },
+              model: {
+                type: "string",
+                enum: [...CLAUDE_MODELS],
+                description: "Claude Code only: model the group's session runs on, opus at most",
+              },
               skill: { type: "string" },
               instructions: { type: "string" },
               items: { type: "array", items: { type: "string", description: "Plane key, e.g. LYRE-12" } },
@@ -191,6 +197,7 @@ function batchGroups(args: Record<string, unknown>): BatchGroupInput[] | undefin
       name,
       skill: text(fields, "skill"),
       instructions: text(fields, "instructions"),
+      model: text(fields, "model").toLowerCase(),
       items: (fields.items as string[]).map((item) => item.trim().toUpperCase()),
     })
   }
@@ -272,7 +279,7 @@ async function callTool(
     case "set_batch_groups": {
       const groups = batchGroups(args)
       if (!groups || groups.length === 0) {
-        return { text: "groups must be a non-empty list of { name, skill, instructions, items }", isError: true }
+        return { text: "groups must be a non-empty list of { name, model, skill, instructions, items }", isError: true }
       }
       return (await setBatchGroups(workspace, groups)) ?? { text: UNLINKED, isError: false }
     }

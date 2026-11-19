@@ -14,13 +14,16 @@ Every 30 s it reads the project's work items and:
   (`Claude Code` or `OpenCode`) whose blockers are all **Merged**, lowest
   number first, while fewer than `MAX_RUNNING_WORKSPACES` workspaces run;
 - creates it for the item's first assignee, as the Coder user with the same
-  email, else for Coder's admin;
+  email, else for Coder's admin; the assignee's Plane name and email become
+  the workspace's git identity (`git_user_name`, `git_user_email`), else the
+  Coder owner's;
 - names it `lyre-<n>`, on branch `<type>/lyre-<n>-<title slug>`, where
   `<type>` comes from the item's `Kind` label (`Feature` → `feat`, `Fix`,
   `Hotfix`, `Refactor`, `Chore`, `Docs`) and is `feat` without one, with the
   item's `Repository` labels (else its nearest ancestor's) and a prompt built for
   the item's `Issue Type` (`Research` and `Spec` items open no pull requests);
-- adds a "Coder workspace" link on the item and moves it to **In Progress**;
+- adds a "Coder workspace" link on the item and moves it to **In Progress**
+  with the `Model` label of its first session;
 - moves an item from **Waiting** back to **In Progress** on the first comment
   not posted by this service after a question;
 - acts on a linked item only when its state changed since the last tick:
@@ -38,7 +41,7 @@ Every 30 s it reads the project's work items and:
 
 States and labels are found by the `external_id` Plane provisioning stamps
 on them (`todo`, `waiting`, `agent/claude_code`, `issue_type/spec`,
-`kind/fix`, …), never by name.
+`kind/fix`, `model/opus`, …), never by name.
 
 ## Batch groups
 
@@ -47,7 +50,8 @@ An `Agent` item with a child not in **Finished**, **Needs Review**,
 agent in the same workspace:
 
 1. **planning**: the agent calls `set_batch_groups` (repeatable, it
-   replaces the groups) and then `finish_work_item`;
+   replaces the groups), giving a Claude Code item's groups a model each
+   (`haiku`, `sonnet` or `opus`), and then `finish_work_item`;
 2. **groups**: one session per group, in order; its tickets move to
    **In Progress** when it starts and **Finished** on `finish_work_item`;
 3. **pull_requests**: one session opens the pull requests; skipped for
@@ -60,6 +64,12 @@ leaf must be covered exactly once. Groups are fixed once the first one
 started: moving the item back to **Todo** clears them and plans again. An
 item without open children runs one session, as before.
 
+Claude Code runs the planning session and a single session on `opus`, each
+group on its own model and the pull-request session on `sonnet`; OpenCode
+always runs on its own model. A session stamps its `Model` label (`Opus`,
+`Sonnet`, `Haiku`, `DeepSeek V4.1 Flash`) on the tickets it works: the item
+for planning and single sessions, the group's tickets when a group starts.
+
 ## MCP tools
 
 Workspaces reach
@@ -67,15 +77,15 @@ Workspaces reach
 
 - `get_work_item { key? }` returns the item as Markdown: description, parents
   with their comments, the descendant tree, batch groups, blockers and
-  comments. With `key`, it returns that child or sub-child instead:
-  description, children, blockers and comments; a key outside the item's
-  subtree is refused.
+  comments, with each item's attachments. With `key`, it returns that child
+  or sub-child instead: description, attachments, children, blockers and
+  comments; a key outside the item's subtree is refused.
 - `add_comment { body }` posts Markdown on the item.
 - `finish_work_item { summary }` posts the summary and ends the session's
   task: the next batch group or the pull-request session follows, or the
   item moves to **Needs Review** if it opened a pull request, else to
   **Finished**.
-- `set_batch_groups { groups: [{ name, skill, instructions, items }] }`
+- `set_batch_groups { groups: [{ name, model, skill, instructions, items }] }`
   saves the batch groups, in the planning session only.
 - `create_pull_request { repository, head, base, title, body, draft }` opens
   a pull request from a branch the item owns and links it on the item.
@@ -89,9 +99,11 @@ Workspaces reach
   to the item, and waits up to 25 s for the answer.
 - `answer_status {}` waits up to 25 s more on the workspace's last question.
 
-A workspace holds one pending question at a time: asking again while one is
-pending waits on it instead. Questions never expire. The operator's first
-reply comment is the answer.
+A workspace holds one pending question at a time: asking again posts the new
+question, marked as replacing the previous one, which no longer waits for an
+answer nor shows in `/waiting`; a reply already posted to it is still
+delivered. Questions never expire. The operator's first reply comment is the
+answer.
 
 The caller is identified as in the gatekeeper: the running pod whose IP is
 the TCP peer in `WORKSPACES_NAMESPACE`. A workspace not started from a work
@@ -110,9 +122,16 @@ body acknowledges it.
 
 `GET /sessions/current` on the MCP port, served to workspace pods only,
 returns the batch session the workspace should run: the prompt as text, with
-`X-Session-Id` (changes when a new session must start) and `X-Session-Phase`,
-or `204` for an item without batch groups or a workspace not started from
-one. Read from SQLite only.
+`X-Session-Id` (changes when a new session must start), `X-Session-Phase`
+and `X-Session-Model` (empty for OpenCode), or `204` for an item without
+batch groups or a workspace not started from one. Read from SQLite only.
+
+## Attachments
+
+`GET /attachments/<KEY>/<id>` on the MCP port, served to workspace pods
+only, streams a Plane attachment with its type and file name, for the
+workspace's item, its parents and its children; `get_work_item` lists them
+with that URL. Any other key or id gets `404`.
 
 ## GitHub
 
@@ -183,7 +202,7 @@ skips the wait.
 
 | Variable | Value |
 | --- | --- |
-| `MCP_PORT` | Port serving `/mcp`, `/answers/next`, `/sessions/current` and `/git/`, `4331` |
+| `MCP_PORT` | Port serving `/mcp`, `/answers/next`, `/sessions/current`, `/attachments/` and `/git/`, `4331` |
 | `INTERNAL_PORT` | Port of the internal API, `4332` |
 | `DATABASE_PATH` | SQLite file, on the data volume |
 | `WORKSPACES_NAMESPACE` | Namespace of the workspace pods allowed on `/mcp` |

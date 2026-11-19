@@ -2,6 +2,7 @@ import { env } from "./env.ts"
 
 const KEY_LABEL = "agent-control-plane"
 const REQUEST_TIMEOUT_MILLISECONDS = 30_000
+const DOWNLOAD_TIMEOUT_MILLISECONDS = 120_000
 
 export class PlaneRateLimitedError extends Error {}
 
@@ -116,5 +117,26 @@ export async function planeRequest<T>(method: string, path: string, body?: unkno
     if (!response.ok) throw new Error(`${method} ${path}: ${response.status}`)
     if (response.status === 204) return undefined as T
     return (await response.json()) as T
+  }
+}
+
+export async function planeDownload(path: string): Promise<Response> {
+  if (!apiKey) await signIn()
+  for (let attempt = 0; ; attempt++) {
+    const response = await fetch(env("PLANE_URL") + path, {
+      headers: { "X-Api-Key": apiKey ?? "" },
+      redirect: "manual",
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MILLISECONDS),
+    })
+    if (response.status === 401 && attempt === 0) {
+      await signIn()
+      continue
+    }
+    if (response.status === 429) throw new PlaneRateLimitedError(`GET ${path}: 429`)
+    const location = response.headers.get("location")
+    if (response.status >= 300 && response.status < 400 && location) {
+      return fetch(new URL(location, env("PLANE_URL")), { signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MILLISECONDS) })
+    }
+    return response
   }
 }

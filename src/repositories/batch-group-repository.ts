@@ -7,12 +7,13 @@ type Row = {
   name: string
   skill: string
   instructions: string
+  model: string
   status: BatchGroupStatus
 }
 
 const statements = {
   insertGroup: database.prepare(
-    "INSERT INTO batch_groups (item_id, position, name, skill, instructions, status) VALUES (?, ?, ?, ?, ?, 'pending')",
+    "INSERT INTO batch_groups (item_id, position, name, skill, instructions, model, status) VALUES (?, ?, ?, ?, ?, ?, 'pending')",
   ),
   insertMember: database.prepare("INSERT INTO batch_group_items (item_id, position, member_id) VALUES (?, ?, ?)"),
   selectGroups: database.prepare("SELECT * FROM batch_groups WHERE item_id = ? ORDER BY position"),
@@ -30,6 +31,7 @@ function toGroup(row: Row): BatchGroup {
     name: row.name,
     skill: row.skill,
     instructions: row.instructions,
+    model: row.model,
     status: row.status,
     memberIds: members.map((member) => member.member_id),
   }
@@ -42,13 +44,13 @@ export function clear(itemId: string): void {
 
 export function replace(
   itemId: string,
-  groups: { name: string; skill: string; instructions: string; memberIds: string[] }[],
+  groups: { name: string; skill: string; instructions: string; model: string; memberIds: string[] }[],
 ): void {
   database.exec("BEGIN")
   try {
     clear(itemId)
     groups.forEach((group, position) => {
-      statements.insertGroup.run(itemId, position, group.name, group.skill, group.instructions)
+      statements.insertGroup.run(itemId, position, group.name, group.skill, group.instructions, group.model)
       for (const memberId of group.memberIds) statements.insertMember.run(itemId, position, memberId)
     })
     database.exec("COMMIT")
