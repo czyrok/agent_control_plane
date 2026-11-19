@@ -114,8 +114,8 @@ one. Read from SQLite only.
 
 ## GitHub
 
-Workspaces hold no GitHub token. Their git rewrites
-`https://github.com/` to `/git/` on the MCP port, which proxies git
+Workspaces hold no GitHub token. Their git rewrites GitHub's HTTPS and SSH
+URLs to `/git/` on the MCP port, which proxies git
 smart-HTTP to GitHub with `GITHUB_TOKEN`, for `AGENT_REPOSITORIES` only:
 
 - clone and fetch pass through, from any workspace;
