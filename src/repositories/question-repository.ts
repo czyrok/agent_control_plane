@@ -16,7 +16,10 @@ const statements = {
     "INSERT INTO questions (id, item_id, workspace, created_at, answer, answered_at, delivered_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
   ),
   selectById: database.prepare("SELECT * FROM questions WHERE id = ?"),
-  selectUnanswered: database.prepare("SELECT * FROM questions WHERE answer IS NULL ORDER BY created_at"),
+  selectUnanswered: database.prepare(
+    "SELECT * FROM questions WHERE answer IS NULL AND superseded_at IS NULL ORDER BY created_at",
+  ),
+  updateSuperseded: database.prepare("UPDATE questions SET superseded_at = ? WHERE id = ? AND answer IS NULL"),
   updateAnswer: database.prepare("UPDATE questions SET answer = ?, answered_at = ? WHERE id = ?"),
   selectLatestByWorkspace: database.prepare("SELECT * FROM questions WHERE workspace = ? ORDER BY created_at DESC LIMIT 1"),
   selectOldestUndelivered: database.prepare(
@@ -62,6 +65,10 @@ export function findUnanswered(): Question[] {
 
 export function setAnswer(id: string, answer: string): void {
   statements.updateAnswer.run(answer, new Date().toISOString(), id)
+}
+
+export function markSuperseded(id: string): void {
+  statements.updateSuperseded.run(new Date().toISOString(), id)
 }
 
 export function findLatestByWorkspace(workspace: string): Question | undefined {

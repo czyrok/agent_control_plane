@@ -22,13 +22,19 @@ export async function askOperator(
   const link = workItemWorkspaceRepository.findByWorkspace(workspace)
   if (!link) return undefined
   const latest = questionRepository.findLatestByWorkspace(workspace)
-  if (latest && latest.answer === null) return waitForAnswer(latest.id, waitMilliseconds)
+  const replacing = latest !== undefined && latest.answer === null && !(await recordReply(latest))
+  if (replacing) {
+    questionRepository.markSuperseded(latest.id)
+    wakeWaiters(latest.id)
+  }
 
   const id = crypto.randomUUID()
   const createdAt = new Date().toISOString()
   await planeWorkItemRepository.addComment(
     link.itemId,
-    await marked.parse(`**Question from the agent**\n\n${question}`),
+    await marked.parse(
+      `**Question from the agent**${replacing ? " (replaces the previous unanswered one)" : ""}\n\n${question}`,
+    ),
     id,
   )
   questionRepository.insert({
@@ -68,15 +74,20 @@ export function acknowledgeAnswer(workspace: string, id: string): void {
   questionRepository.markDelivered(id)
 }
 
+async function recordReply(question: Question): Promise<boolean> {
+  const asked = Date.parse(question.createdAt)
+  const reply = (await planeWorkItemRepository.listComments(question.itemId)).find(
+    (comment) => comment.externalSource !== COMMENT_SOURCE && Date.parse(comment.createdAt) > asked,
+  )
+  if (!reply) return false
+  questionRepository.setAnswer(question.id, reply.text)
+  wakeWaiters(question.id)
+  return true
+}
+
 export async function syncQuestionAnswers(): Promise<void> {
   for (const question of questionRepository.findUnanswered()) {
-    const asked = Date.parse(question.createdAt)
-    const reply = (await planeWorkItemRepository.listComments(question.itemId)).find(
-      (comment) => comment.externalSource !== COMMENT_SOURCE && Date.parse(comment.createdAt) > asked,
-    )
-    if (!reply) continue
-    questionRepository.setAnswer(question.id, reply.text)
-    wakeWaiters(question.id)
+    if (!(await recordReply(question))) continue
     await planeWorkItemRepository.setState(question.itemId, await planeProjectService.stateIdByKey("in_progress"))
   }
 }

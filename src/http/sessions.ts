@@ -19,6 +19,7 @@ export async function handleSessions(request: IncomingMessage, response: ServerR
       "Content-Type": "text/plain; charset=utf-8",
       "X-Session-Id": String(session.revision),
       "X-Session-Phase": session.phase,
+      "X-Session-Model": session.model,
     })
     .end(session.prompt)
 }

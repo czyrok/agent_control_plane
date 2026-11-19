@@ -17,6 +17,7 @@ const BRANCH_PREFIXES: Record<string, string> = {
 const DEFAULT_BRANCH_PREFIX = "feat"
 const REPOSITORY_LABEL_PREFIX = "repository/"
 const UNBATCHABLE_STATES = new Set(["finished", "needs_review", "merged", "cancelled"])
+const MODEL_LABEL_PREFIX = "model/"
 
 export type Scope = "research" | "spec"
 
@@ -69,6 +70,15 @@ export async function scopeOf(item: WorkItem): Promise<Scope | undefined> {
 
 export async function branchPrefixOf(item: WorkItem): Promise<string> {
   return (await externalLabelIds(item)).map((externalId) => BRANCH_PREFIXES[externalId]).find(Boolean) ?? DEFAULT_BRANCH_PREFIX
+}
+
+export async function withModelLabel(item: WorkItem, labelKey: string | undefined): Promise<string[] | undefined> {
+  if (!labelKey) return undefined
+  const { labelsById } = await loadCatalog()
+  const target = [...labelsById.values()].find((label) => label.externalId === labelKey)
+  if (!target) return undefined
+  const kept = item.labelIds.filter((id) => !labelsById.get(id)?.externalId?.startsWith(MODEL_LABEL_PREFIX))
+  return [...kept, target.id]
 }
 
 export async function labelNames(item: WorkItem): Promise<string[]> {

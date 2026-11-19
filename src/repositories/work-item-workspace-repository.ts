@@ -14,13 +14,14 @@ type Row = {
   current_group: number | null
   session_revision: number
   session_prompt: string
+  session_model: string
   synced_state_id: string | null
   deleted_at: string | null
 }
 
 const statements = {
   insert: database.prepare(
-    "INSERT OR REPLACE INTO work_item_workspaces (item_id, item_key, item_name, workspace, workspace_id, created_at, stopped_at, branch, phase, current_group, session_revision, session_prompt, synced_state_id, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    "INSERT OR REPLACE INTO work_item_workspaces (item_id, item_key, item_name, workspace, workspace_id, created_at, stopped_at, branch, phase, current_group, session_revision, session_prompt, session_model, synced_state_id, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
   ),
   selectByItemId: database.prepare("SELECT * FROM work_item_workspaces WHERE item_id = ?"),
   selectByWorkspace: database.prepare("SELECT * FROM work_item_workspaces WHERE workspace = ? AND deleted_at IS NULL"),
@@ -29,7 +30,7 @@ const statements = {
   updateStopped: database.prepare("UPDATE work_item_workspaces SET stopped_at = ? WHERE item_id = ?"),
   clearStopped: database.prepare("UPDATE work_item_workspaces SET stopped_at = NULL WHERE item_id = ?"),
   updateSession: database.prepare(
-    "UPDATE work_item_workspaces SET phase = ?, current_group = ?, session_prompt = ?, session_revision = session_revision + 1 WHERE item_id = ?",
+    "UPDATE work_item_workspaces SET phase = ?, current_group = ?, session_prompt = ?, session_model = ?, session_revision = session_revision + 1 WHERE item_id = ?",
   ),
   updateDone: database.prepare("UPDATE work_item_workspaces SET phase = 'done', current_group = NULL WHERE item_id = ?"),
   updateSyncedState: database.prepare("UPDATE work_item_workspaces SET synced_state_id = ? WHERE item_id = ?"),
@@ -50,6 +51,7 @@ function toLink(row: Row): WorkItemWorkspace {
     currentGroup: row.current_group,
     sessionRevision: row.session_revision,
     sessionPrompt: row.session_prompt,
+    sessionModel: row.session_model,
     syncedStateId: row.synced_state_id,
     deletedAt: row.deleted_at,
   }
@@ -69,6 +71,7 @@ export function insert(link: WorkItemWorkspace): void {
     link.currentGroup,
     link.sessionRevision,
     link.sessionPrompt,
+    link.sessionModel,
     link.syncedStateId,
     link.deletedAt,
   )
@@ -100,8 +103,14 @@ export function clearStopped(itemId: string): void {
   statements.clearStopped.run(itemId)
 }
 
-export function setSession(itemId: string, phase: SessionPhase, currentGroup: number | null, prompt: string): void {
-  statements.updateSession.run(phase, currentGroup, prompt, itemId)
+export function setSession(
+  itemId: string,
+  phase: SessionPhase,
+  currentGroup: number | null,
+  prompt: string,
+  model: string,
+): void {
+  statements.updateSession.run(phase, currentGroup, prompt, model, itemId)
 }
 
 export function markDone(itemId: string): void {

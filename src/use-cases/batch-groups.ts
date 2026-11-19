@@ -4,6 +4,7 @@ import * as planeWorkItemRepository from "../repositories/plane-work-item-reposi
 import * as workItemWorkspaceRepository from "../repositories/work-item-workspace-repository.ts"
 import { buildGroupPrompt, buildPlanningPrompt, buildPullRequestPrompt } from "../services/agent-prompt-service.ts"
 import * as planeProjectService from "../services/plane-project-service.ts"
+import { isClaudeModel, modelLabelKey, PLANNING_MODEL, PULL_REQUEST_MODEL, sessionModel } from "../shared/models.ts"
 import type { BatchGroupInput, SessionPhase, WorkItem, WorkItemWorkspace } from "../shared/types.ts"
 import { comment } from "./work-item-tools.ts"
 
@@ -33,6 +34,9 @@ export async function setBatchGroups(
     }
   }
   const items = await planeWorkItemRepository.listWorkItems()
+  const root = items.find((candidate) => candidate.id === link.itemId)
+  if (!root) return { text: `${link.itemKey} no longer exists in Plane.`, isError: true }
+  const agent = await planeProjectService.agentOf(root)
   const descendants = planeWorkItemRepository.descendantsOf(link.itemId, items)
   const batchable = await batchableDescendants(link.itemId, items)
   const batchableIds = new Set(batchable.map((item) => item.id))
@@ -44,6 +48,9 @@ export async function setBatchGroups(
   const coverage = new Map<string, number>()
   const resolved = groups.map((group, index) => {
     if (group.items.length === 0) problems.push(`group ${index + 1} "${group.name}" has no ticket`)
+    if (agent === "claude-code" && !isClaudeModel(group.model)) {
+      problems.push(`group ${index + 1} "${group.name}" needs a model: haiku, sonnet or opus`)
+    }
     const memberIds = new Set<string>()
     for (const key of group.items) {
       if (listed.has(key)) problems.push(`${key} is listed twice`)
@@ -59,7 +66,13 @@ export async function setBatchGroups(
         coverage.set(member.id, (coverage.get(member.id) ?? 0) + 1)
       }
     }
-    return { name: group.name, skill: group.skill, instructions: group.instructions, memberIds: [...memberIds] }
+    return {
+      name: group.name,
+      skill: group.skill,
+      instructions: group.instructions,
+      model: sessionModel(agent, group.model),
+      memberIds: [...memberIds],
+    }
   })
   const leaves = batchable.filter((item) => !batchable.some((other) => other.parentId === item.id))
   for (const leaf of leaves) {
@@ -72,7 +85,7 @@ export async function setBatchGroups(
   batchGroupRepository.replace(link.itemId, resolved)
   const keyOf = new Map(items.map((item) => [item.id, item.key]))
   const rendered = resolved
-    .map((group, index) => `${index + 1}. ${group.name}: ${group.memberIds.map((id) => keyOf.get(id) ?? id).join(", ")}`)
+    .map((group, index) => `${index + 1}. ${group.name}${group.model ? ` (${group.model})` : ""}: ${group.memberIds.map((id) => keyOf.get(id) ?? id).join(", ")}`)
     .join("\n")
   return { text: `Batch groups saved for ${link.itemKey}:\n${rendered}`, isError: false }
 }
@@ -80,11 +93,25 @@ export async function setBatchGroups(
 async function startGroup(link: WorkItemWorkspace, item: WorkItem, items: WorkItem[], position: number): Promise<string> {
   const groups = batchGroupRepository.listByItem(link.itemId)
   const group = groups[position]
-  await setStates(group.memberIds, "in_progress")
+  const agent = await planeProjectService.agentOf(item)
+  const inProgress = await planeProjectService.stateIdByKey("in_progress")
+  for (const memberId of group.memberIds) {
+    const member = items.find((candidate) => candidate.id === memberId)
+    const labels = member
+      ? await planeProjectService.withModelLabel(member, modelLabelKey(agent, group.model))
+      : undefined
+    await planeWorkItemRepository.setState(memberId, inProgress, labels)
+  }
   batchGroupRepository.markStatus(link.itemId, position, "in_progress")
   const keyOf = new Map(items.map((candidate) => [candidate.id, candidate.key]))
   const keys = group.memberIds.map((id) => keyOf.get(id) ?? id)
-  workItemWorkspaceRepository.setSession(link.itemId, "groups", position, buildGroupPrompt(item, { ...group, keys }, groups.length))
+  workItemWorkspaceRepository.setSession(
+    link.itemId,
+    "groups",
+    position,
+    buildGroupPrompt(item, { ...group, keys }, groups.length),
+    sessionModel(agent, group.model),
+  )
   return `Session finished. Stop now: batch group ${position + 1} of ${groups.length}, "${group.name}", starts in a new session.`
 }
 
@@ -106,7 +133,13 @@ async function finishItem(link: WorkItemWorkspace): Promise<string> {
 
 async function afterLastGroup(link: WorkItemWorkspace, item: WorkItem): Promise<string> {
   if (await planeProjectService.scopeOf(item)) return finishItem(link)
-  workItemWorkspaceRepository.setSession(link.itemId, "pull_requests", null, buildPullRequestPrompt(item))
+  workItemWorkspaceRepository.setSession(
+    link.itemId,
+    "pull_requests",
+    null,
+    buildPullRequestPrompt(item),
+    sessionModel(await planeProjectService.agentOf(item), PULL_REQUEST_MODEL),
+  )
   return "Session finished. Stop now: the pull-request session starts in a new session."
 }
 
@@ -144,13 +177,20 @@ export async function resetBatch(link: WorkItemWorkspace, items: WorkItem[]): Pr
   const item = items.find((candidate) => candidate.id === link.itemId)
   if (!item) return
   batchGroupRepository.clear(link.itemId)
-  workItemWorkspaceRepository.setSession(link.itemId, "planning", null, buildPlanningPrompt(item))
+  const agent = await planeProjectService.agentOf(item)
+  workItemWorkspaceRepository.setSession(
+    link.itemId,
+    "planning",
+    null,
+    buildPlanningPrompt(item, agent),
+    sessionModel(agent, PLANNING_MODEL),
+  )
 }
 
 export function currentSession(
   workspace: string,
-): { revision: number; prompt: string; phase: SessionPhase } | undefined {
+): { revision: number; prompt: string; phase: SessionPhase; model: string } | undefined {
   const link = workItemWorkspaceRepository.findByWorkspace(workspace)
   if (!link || link.phase === "single") return undefined
-  return { revision: link.sessionRevision, prompt: link.sessionPrompt, phase: link.phase }
+  return { revision: link.sessionRevision, prompt: link.sessionPrompt, phase: link.phase, model: link.sessionModel }
 }
