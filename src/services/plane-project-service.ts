@@ -5,14 +5,14 @@ import type { PlaneLabel, PlaneState, WorkItem } from "../shared/types.ts"
 const CATALOG_LIFETIME_MILLISECONDS = 300_000
 
 const AGENTS: Record<string, string> = { "agent/claude_code": "claude-code", "agent/opencode": "opencode" }
-const SCOPES: Record<string, Scope> = { "scope/research": "research", "scope/spec": "spec" }
+const SCOPES: Record<string, Scope> = { "issue_type/research": "research", "issue_type/spec": "spec" }
 const BRANCH_PREFIXES: Record<string, string> = {
-  "type/feature": "feat",
-  "type/fix": "fix",
-  "type/hotfix": "hotfix",
-  "type/refactor": "refactor",
-  "type/chore": "chore",
-  "type/docs": "docs",
+  "kind/feature": "feat",
+  "kind/fix": "fix",
+  "kind/hotfix": "hotfix",
+  "kind/refactor": "refactor",
+  "kind/chore": "chore",
+  "kind/docs": "docs",
 }
 const DEFAULT_BRANCH_PREFIX = "feat"
 const REPOSITORY_LABEL_PREFIX = "repository/"

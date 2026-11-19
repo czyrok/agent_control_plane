@@ -13,19 +13,20 @@ Every 30 s it reads the project's work items and:
   (`Claude Code` or `OpenCode`) whose blockers are all **Merged**, lowest
   number first, while fewer than `MAX_RUNNING_WORKSPACES` workspaces run;
 - names it `lyre-<n>`, on branch `<type>/lyre-<n>-<title slug>`, where
-  `<type>` comes from the item's `Type` label (`Feature` → `feat`, `Fix`,
+  `<type>` comes from the item's `Kind` label (`Feature` → `feat`, `Fix`,
   `Hotfix`, `Refactor`, `Chore`, `Docs`) and is `feat` without one, with the
   item's `Repository` labels (else its nearest ancestor's) and a prompt built for
-  the item's scope (`Research` and `Spec` items open no pull requests);
+  the item's `Issue Type` (`Research` and `Spec` items open no pull requests);
 - adds a "Coder workspace" link on the item and moves it to **In Progress**;
 - moves an item from **Waiting** back to **In Progress** on the first comment
   not posted by this service after a question;
 - stops the workspace of an item moved to **Merged** or **Cancelled**, or
-  deleted. **Finished** keeps it running for review feedback.
+  deleted. **Finished** and **Needs Review** keep it running for review
+  feedback.
 
 States and labels are found by the `external_id` Plane provisioning stamps
-on them (`todo`, `waiting`, `agent/claude_code`, `scope/spec`, `type/fix`, …), never by
-name.
+on them (`todo`, `waiting`, `agent/claude_code`, `issue_type/spec`,
+`kind/fix`, …), never by name.
 
 ## MCP tools
 
