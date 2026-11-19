@@ -21,7 +21,8 @@ Every 30 s it reads the project's work items and:
 - moves an item from **Waiting** back to **In Progress** on the first comment
   not posted by this service after a question;
 - stops the workspace of an item moved to **Merged** or **Cancelled**, or
-  deleted. **Finished** keeps it running for review feedback.
+  deleted. **Finished** and **Needs Review** keep it running for review
+  feedback.
 
 States and labels are found by the `external_id` Plane provisioning stamps
 on them (`todo`, `waiting`, `agent/claude_code`, `issue_type/spec`,
