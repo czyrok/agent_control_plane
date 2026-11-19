@@ -1,4 +1,4 @@
-import { countRunningWorkspaces, createWorkspace, findTemplateId } from "../infrastructure/coder.ts"
+import { countRunningWorkspaces, createWorkspace, findTemplateId, findUserByEmail } from "../infrastructure/coder.ts"
 import { env } from "../infrastructure/env.ts"
 import { PlaneRateLimitedError } from "../infrastructure/plane.ts"
 import * as planeWorkItemRepository from "../repositories/plane-work-item-repository.ts"
@@ -31,11 +31,18 @@ function hasLiveWorkspace(item: WorkItem): boolean {
   return link !== undefined && link.deletedAt === null
 }
 
+async function ownerOf(item: WorkItem): Promise<string> {
+  const [first] = item.assigneeIds
+  if (!first) return "me"
+  const email = (await planeWorkItemRepository.listMemberEmails()).get(first)
+  return (email && (await findUserByEmail(email))) || "me"
+}
+
 async function start(item: WorkItem, agent: string, itemsById: Map<string, WorkItem>): Promise<void> {
   const name = item.key.toLowerCase()
   const prefix = await planeProjectService.branchPrefixOf(item)
   const branch = `${prefix}/${name}-${slug(item.name)}`.slice(0, BRANCH_MAX_LENGTH).replace(/-+$/, "")
-  const workspace = await createWorkspace(name, await findTemplateId(env("CODER_TEMPLATE")), {
+  const workspace = await createWorkspace(await ownerOf(item), name, await findTemplateId(env("CODER_TEMPLATE")), {
     repositories: JSON.stringify(await planeProjectService.repositoriesOf(item, itemsById)),
     base_branch: "main",
     feature_branch: branch,

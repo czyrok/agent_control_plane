@@ -7,6 +7,7 @@ export type WorkItem = {
   stateId: string
   parentId: string | null
   labelIds: string[]
+  assigneeIds: string[]
 }
 
 export type PlaneState = { id: string; name: string; group: string; externalId: string | null }

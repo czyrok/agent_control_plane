@@ -72,6 +72,7 @@ export async function listWorkItems(): Promise<WorkItem[]> {
     state: string
     parent: string | null
     labels: string[]
+    assignees: string[] | null
   }>(`${await projectPath()}/issues/`)
   return items.map((item) => ({
     id: item.id,
@@ -82,6 +83,7 @@ export async function listWorkItems(): Promise<WorkItem[]> {
     stateId: item.state,
     parentId: item.parent,
     labelIds: item.labels,
+    assigneeIds: item.assignees ?? [],
   }))
 }
 
@@ -95,6 +97,11 @@ export function descendantsOf(itemId: string, items: WorkItem[]): WorkItem[] {
     level = children.map((child) => child.id)
   }
   return found
+}
+
+export async function listMemberEmails(): Promise<Map<string, string>> {
+  const members = await planeRequest<{ id: string; email: string }[]>("GET", `${workspacePath()}/members/`)
+  return new Map(members.map((member) => [member.id, member.email]))
 }
 
 export async function listStates(): Promise<PlaneState[]> {

@@ -69,19 +69,20 @@ export async function findTemplateId(name: string): Promise<string> {
 }
 
 export async function createWorkspace(
+  owner: string,
   name: string,
   templateId: string,
   parameters: Record<string, string>,
 ): Promise<CoderWorkspace> {
-  const response = await coderRequest("POST", "/api/v2/users/me/workspaces", {
+  const response = await coderRequest("POST", `/api/v2/users/${owner}/workspaces`, {
     name,
     template_id: templateId,
     rich_parameter_values: Object.entries(parameters).map(([parameter, value]) => ({ name: parameter, value })),
   })
   if (response.status === 409) {
-    return toWorkspace(await coderJson<WorkspacePayload>("GET", `/api/v2/users/me/workspace/${name}`))
+    return toWorkspace(await coderJson<WorkspacePayload>("GET", `/api/v2/users/${owner}/workspace/${name}`))
   }
-  if (response.status !== 201) throw new Error(`POST /api/v2/users/me/workspaces: ${response.status}`)
+  if (response.status !== 201) throw new Error(`POST /api/v2/users/${owner}/workspaces: ${response.status}`)
   return toWorkspace((await response.json()) as WorkspacePayload)
 }
 
@@ -104,4 +105,12 @@ export async function deleteWorkspace(id: string): Promise<void> {
 
 export async function countRunningWorkspaces(): Promise<number> {
   return (await listWorkspaces()).filter((workspace) => workspace.status === "running").length
+}
+
+export async function findUserByEmail(email: string): Promise<string | undefined> {
+  const { users } = await coderJson<{ users: { username: string; email: string }[] }>(
+    "GET",
+    `/api/v2/users?q=${encodeURIComponent(email)}`,
+  )
+  return users.find((user) => user.email.toLowerCase() === email.toLowerCase())?.username
 }

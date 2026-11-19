@@ -12,6 +12,8 @@ Every 30 s it reads the project's work items and:
 - starts a workspace for each item in **Todo** carrying an `Agent` label
   (`Claude Code` or `OpenCode`) whose blockers are all **Merged**, lowest
   number first, while fewer than `MAX_RUNNING_WORKSPACES` workspaces run;
+- creates it for the item's first assignee, as the Coder user with the same
+  email, else for Coder's admin;
 - names it `lyre-<n>`, on branch `<type>/lyre-<n>-<title slug>`, where
   `<type>` comes from the item's `Kind` label (`Feature` → `feat`, `Fix`,
   `Hotfix`, `Refactor`, `Chore`, `Docs`) and is `feat` without one, with the
@@ -146,8 +148,9 @@ The Terraform module in `.terraform-module/` sets all of them.
 
 - The Plane API key is re-minted on every start: the previous key labelled
   `agent-control-plane` is revoked first.
-- Workspaces are owned by Coder's `admin`. Signed in to Coder as another user,
-  they stay hidden unless that user is an owner.
+- A workspace falls back to Coder's `admin` when the item has no assignee or
+  the assignee has no Coder account with the same email; only the first
+  assignee at creation counts.
 - Plane allows 60 API requests a minute per instance, shared by the sync and
   the agents' tool calls. A `429` skips the tick; raise
   `API_KEY_RATE_LIMIT` on Plane's API if it happens often.
