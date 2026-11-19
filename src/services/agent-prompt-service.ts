@@ -13,7 +13,7 @@ function researchTail(scope: Scope): string {
 }
 
 const DEFAULT_TAIL =
-  "Follow the branch and pull request rules of this workspace. Once your pull requests are open, call finish_work_item with a summary."
+  "Do the whole task in this session without waiting for anyone: follow the branch and pull request rules of this workspace. Once your pull requests are open, call finish_work_item with a summary."
 
 export function buildPrompt(item: WorkItem, scope: Scope | undefined): string {
   return `${opening(item)}\n\n${scope ? researchTail(scope) : DEFAULT_TAIL}`
@@ -24,7 +24,9 @@ export function buildPlanningPrompt(item: WorkItem): string {
 }
 
 export function buildGroupPrompt(item: WorkItem, group: BatchGroup & { keys: string[] }, total: number): string {
-  const skill = group.skill ? `Use the ${group.skill} skill for this work. ` : ""
+  const skill = group.skill
+    ? `Use the ${group.skill} skill for this work, and carry it through to committed, pushed work: when the skill would present its result, ask for a go-ahead or suggest running another skill, do that next step yourself. `
+    : ""
   return `${opening(item)}\n\nThis session runs batch group ${group.position + 1} of ${total}, "${group.name}", covering ${group.keys.join(", ")}. get_work_item shows every group and its state. Read each ticket of this group with get_work_item { key } before working on it. ${skill}${group.instructions}\n\nCommit on your branches and push them; open no pull request, a later session does. When this group is done, call finish_work_item with a summary: the next group starts in a new session.`
 }
 
