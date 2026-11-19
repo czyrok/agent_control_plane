@@ -64,8 +64,11 @@ item without open children runs one session, as before.
 Workspaces reach
 `http://agent-control-plane-mcp.coder.svc.cluster.local/mcp` (port 4331):
 
-- `get_work_item {}` returns the item as Markdown: description, parents with
-  their comments, the descendant tree, batch groups, blockers and comments.
+- `get_work_item { key? }` returns the item as Markdown: description, parents
+  with their comments, the descendant tree, batch groups, blockers and
+  comments. With `key`, it returns that child or sub-child instead:
+  description, children, blockers and comments; a key outside the item's
+  subtree is refused.
 - `add_comment { body }` posts Markdown on the item.
 - `finish_work_item { summary }` posts the summary and ends the session's
   task: the next batch group or the pull-request session follows, or the

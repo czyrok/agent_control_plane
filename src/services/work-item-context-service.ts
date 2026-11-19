@@ -47,6 +47,22 @@ async function childLines(parentId: string, items: WorkItem[], depth: number, vi
   return lines
 }
 
+async function childrenSection(itemId: string, items: WorkItem[]): Promise<string[]> {
+  const children = await childLines(itemId, items, 0, new Set([itemId]))
+  return children.length > 0 ? ["## Children", children.join("\n")] : []
+}
+
+async function blockersSection(item: WorkItem, itemsById: Map<string, WorkItem>): Promise<string[]> {
+  const blockers = (await planeWorkItemRepository.findBlockerIds(item.id)).flatMap((id) => itemsById.get(id) ?? [])
+  if (blockers.length === 0) return []
+  const sections = ["## Blocked by"]
+  for (const blocker of blockers) {
+    sections.push(await heading(blocker, "###"), description(blocker))
+    if (await planeProjectService.scopeOf(blocker)) sections.push(`Comments:\n\n${await comments(blocker)}`)
+  }
+  return sections
+}
+
 export async function describeWorkItem(itemId: string, phase?: SessionPhase): Promise<string | undefined> {
   const items = await planeWorkItemRepository.listWorkItems()
   const itemsById = new Map(items.map((item) => [item.id, item]))
@@ -65,8 +81,7 @@ export async function describeWorkItem(itemId: string, phase?: SessionPhase): Pr
     }
   }
 
-  const children = await childLines(item.id, items, 0, new Set([item.id]))
-  if (children.length > 0) sections.push("## Children", children.join("\n"))
+  sections.push(...(await childrenSection(item.id, items)))
 
   const groups = batchGroupRepository.listByItem(item.id)
   if (groups.length > 0) {
@@ -81,15 +96,24 @@ export async function describeWorkItem(itemId: string, phase?: SessionPhase): Pr
     )
   }
 
-  const blockers = (await planeWorkItemRepository.findBlockerIds(item.id)).flatMap((id) => itemsById.get(id) ?? [])
-  if (blockers.length > 0) {
-    sections.push("## Blocked by")
-    for (const blocker of blockers) {
-      sections.push(await heading(blocker, "###"), description(blocker))
-      if (await planeProjectService.scopeOf(blocker)) sections.push(`Comments:\n\n${await comments(blocker)}`)
-    }
-  }
+  sections.push(...(await blockersSection(item, itemsById)))
 
+  sections.push("## Comments", await comments(item))
+  return sections.join("\n\n")
+}
+
+export async function describeDescendant(rootId: string, key: string): Promise<string | undefined> {
+  const items = await planeWorkItemRepository.listWorkItems()
+  const wanted = key.trim().toUpperCase()
+  const item = planeWorkItemRepository
+    .descendantsOf(rootId, items)
+    .find((candidate) => candidate.key.toUpperCase() === wanted)
+  if (!item) return undefined
+  const itemsById = new Map(items.map((candidate) => [candidate.id, candidate]))
+
+  const sections = [await heading(item, "#"), description(item)]
+  sections.push(...(await childrenSection(item.id, items)))
+  sections.push(...(await blockersSection(item, itemsById)))
   sections.push("## Comments", await comments(item))
   return sections.join("\n\n")
 }

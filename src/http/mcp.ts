@@ -31,8 +31,13 @@ const TOOLS = [
   {
     name: "get_work_item",
     description:
-      "Read the Plane work item this workspace was started for: description, parents with their comments, children, blockers and comments. Call it first.",
-    inputSchema: { type: "object", properties: {} },
+      "Read the Plane work item this workspace was started for: description, parents with their comments, children, blockers and comments. Call it first. Pass key (e.g. LYRE-12) to read one of its children or sub-children in full: description, children, blockers and comments.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        key: { type: "string", description: "Key of a child or sub-child; omit for this workspace's own item" },
+      },
+    },
   },
   {
     name: "add_comment",
@@ -250,7 +255,7 @@ async function callTool(
   let result: string | undefined
   switch (name) {
     case "get_work_item":
-      result = await getWorkItemContext(workspace)
+      result = await getWorkItemContext(workspace, optionalText(args, "key"))
       break
     case "add_comment": {
       const body = text(args, "body")

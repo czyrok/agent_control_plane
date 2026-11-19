@@ -1,16 +1,22 @@
 import { marked } from "marked"
 import * as planeWorkItemRepository from "../repositories/plane-work-item-repository.ts"
 import * as workItemWorkspaceRepository from "../repositories/work-item-workspace-repository.ts"
-import { describeWorkItem } from "../services/work-item-context-service.ts"
+import { describeDescendant, describeWorkItem } from "../services/work-item-context-service.ts"
 import { finishSession } from "./batch-groups.ts"
 
 export async function comment(itemId: string, markdown: string): Promise<void> {
   await planeWorkItemRepository.addComment(itemId, await marked.parse(markdown), crypto.randomUUID())
 }
 
-export async function getWorkItemContext(workspace: string): Promise<string | undefined> {
+export async function getWorkItemContext(workspace: string, key?: string): Promise<string | undefined> {
   const link = workItemWorkspaceRepository.findByWorkspace(workspace)
   if (!link) return undefined
+  if (key && key.toUpperCase() !== link.itemKey.toUpperCase()) {
+    return (
+      (await describeDescendant(link.itemId, key)) ??
+      `${key} is not under ${link.itemKey}: only its children and sub-children can be read.`
+    )
+  }
   return (await describeWorkItem(link.itemId, link.phase)) ?? `${link.itemKey} no longer exists in Plane.`
 }
 
