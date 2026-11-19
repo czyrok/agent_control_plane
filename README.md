@@ -135,7 +135,7 @@ only by the dashboard namespace:
 
 | Request | Answer |
 | --- | --- |
-| `GET /waiting` | `{items: [{name, url}]}` of unanswered questions |
+| `GET /waiting` | `{items: [{name, label, url}]}` of unanswered questions whose item is still in **Waiting** |
 | `GET /health` | `ok` |
 
 Links, questions, batch groups and owned branches and pull requests live in
