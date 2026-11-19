@@ -5,6 +5,7 @@ import * as planeWorkItemRepository from "../repositories/plane-work-item-reposi
 import * as workItemWorkspaceRepository from "../repositories/work-item-workspace-repository.ts"
 import { buildPlanningPrompt, buildPrompt } from "../services/agent-prompt-service.ts"
 import * as planeProjectService from "../services/plane-project-service.ts"
+import { PLANNING_MODEL, sessionModel, SINGLE_MODEL } from "../shared/models.ts"
 import type { PlaneMember, WorkItem } from "../shared/types.ts"
 
 const BRANCH_MAX_LENGTH = 60
@@ -50,7 +51,8 @@ async function start(item: WorkItem, agent: string, itemsById: Map<string, WorkI
   const branch = `${prefix}/${name}-${slug(item.name)}`.slice(0, BRANCH_MAX_LENGTH).replace(/-+$/, "")
   const phase = (await hasBatchableDescendant(item, itemsById)) ? "planning" : "single"
   const prompt =
-    phase === "planning" ? buildPlanningPrompt(item) : buildPrompt(item, await planeProjectService.scopeOf(item))
+    phase === "planning" ? buildPlanningPrompt(item, agent) : buildPrompt(item, await planeProjectService.scopeOf(item))
+  const model = sessionModel(agent, phase === "planning" ? PLANNING_MODEL : SINGLE_MODEL)
   const assignee = await assigneeOf(item)
   const owner = (assignee && (await findUserByEmail(assignee.email))) || "me"
   const workspace = await createWorkspace(owner, name, await findTemplateId(env("CODER_TEMPLATE")), {
@@ -59,6 +61,7 @@ async function start(item: WorkItem, agent: string, itemsById: Map<string, WorkI
     feature_branch: branch,
     agent,
     feature: prompt,
+    model,
     git_user_name: assignee?.name ?? "",
     git_user_email: assignee?.email ?? "",
   })
@@ -76,6 +79,7 @@ async function start(item: WorkItem, agent: string, itemsById: Map<string, WorkI
     currentGroup: null,
     sessionRevision: 1,
     sessionPrompt: prompt,
+    sessionModel: model,
     syncedStateId: inProgress,
     deletedAt: null,
   })

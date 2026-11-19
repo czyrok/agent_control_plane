@@ -33,6 +33,7 @@ export type WorkItemWorkspace = {
   currentGroup: number | null
   sessionRevision: number
   sessionPrompt: string
+  sessionModel: string
   syncedStateId: string | null
   deletedAt: string | null
 }
@@ -47,11 +48,12 @@ export type BatchGroup = {
   name: string
   skill: string
   instructions: string
+  model: string
   status: BatchGroupStatus
   memberIds: string[]
 }
 
-export type BatchGroupInput = { name: string; skill: string; instructions: string; items: string[] }
+export type BatchGroupInput = { name: string; skill: string; instructions: string; model: string; items: string[] }
 
 export type Question = {
   id: string

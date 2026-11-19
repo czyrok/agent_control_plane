@@ -72,8 +72,14 @@ for (const [column, definition] of [
   ["current_group", "INTEGER"],
   ["session_revision", "INTEGER NOT NULL DEFAULT 0"],
   ["session_prompt", "TEXT NOT NULL DEFAULT ''"],
+  ["session_model", "TEXT NOT NULL DEFAULT ''"],
   ["synced_state_id", "TEXT"],
   ["deleted_at", "TEXT"],
 ]) {
   if (!linkColumns.has(column)) database.exec(`ALTER TABLE work_item_workspaces ADD COLUMN ${column} ${definition}`)
 }
+
+const groupColumns = new Set(
+  (database.prepare("PRAGMA table_info(batch_groups)").all() as { name: string }[]).map((column) => column.name),
+)
+if (!groupColumns.has("model")) database.exec("ALTER TABLE batch_groups ADD COLUMN model TEXT NOT NULL DEFAULT ''")

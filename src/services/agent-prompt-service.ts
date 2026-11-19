@@ -19,8 +19,12 @@ export function buildPrompt(item: WorkItem, scope: Scope | undefined): string {
   return `${opening(item)}\n\n${scope ? researchTail(scope) : DEFAULT_TAIL}`
 }
 
-export function buildPlanningPrompt(item: WorkItem): string {
-  return `${opening(item)}\n\nThis session only plans. Group the children and sub-children of ${item.key} that are not Finished, Needs Review, Merged or Cancelled (never batch those) into ordered batch groups that can each be done in one session, in dependency order. Give each group a short name, the skill to run it with, chosen from the skills under ~/workspace/*/.claude/skills/ (empty if none fits), extra instructions, and the keys of its tickets; listing a ticket covers its open sub-tickets. Read every ticket you batch with get_work_item { key } first: its description, comments and blockers decide its group. Call set_batch_groups with all of them (calling it again replaces the batch), write no code, then call finish_work_item with a summary of the plan.`
+export function buildPlanningPrompt(item: WorkItem, agent: string | undefined): string {
+  const model =
+    agent === "claude-code"
+      ? "the model to run it with (haiku, sonnet or opus; opus is the highest, pick the cheapest that will do the group well), "
+      : ""
+  return `${opening(item)}\n\nThis session only plans. Group the children and sub-children of ${item.key} that are not Finished, Needs Review, Merged or Cancelled (never batch those) into ordered batch groups that can each be done in one session, in dependency order. Give each group a short name, ${model}the skill to run it with, chosen from the skills under ~/workspace/*/.claude/skills/ (empty if none fits), extra instructions, and the keys of its tickets; listing a ticket covers its open sub-tickets. Read every ticket you batch with get_work_item { key } first: its description, comments and blockers decide its group. Call set_batch_groups with all of them (calling it again replaces the batch), write no code, then call finish_work_item with a summary of the plan.`
 }
 
 export function buildGroupPrompt(item: WorkItem, group: BatchGroup & { keys: string[] }, total: number): string {

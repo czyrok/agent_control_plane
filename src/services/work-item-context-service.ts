@@ -106,7 +106,7 @@ export async function describeWorkItem(itemId: string, phase?: SessionPhase): Pr
       groups
         .map(
           (group) =>
-            `${group.position + 1}. ${group.name} — ${group.status}${group.skill ? ` — skill ${group.skill}` : ""}\n   ${group.memberIds.map((id) => itemsById.get(id)?.key ?? id).join(", ")}${group.instructions ? `\n   ${group.instructions}` : ""}`,
+            `${group.position + 1}. ${group.name} — ${group.status}${group.model ? ` — model ${group.model}` : ""}${group.skill ? ` — skill ${group.skill}` : ""}\n   ${group.memberIds.map((id) => itemsById.get(id)?.key ?? id).join(", ")}${group.instructions ? `\n   ${group.instructions}` : ""}`,
         )
         .join("\n"),
     )

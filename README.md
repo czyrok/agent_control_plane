@@ -49,7 +49,8 @@ An `Agent` item with a child not in **Finished**, **Needs Review**,
 agent in the same workspace:
 
 1. **planning**: the agent calls `set_batch_groups` (repeatable, it
-   replaces the groups) and then `finish_work_item`;
+   replaces the groups), giving a Claude Code item's groups a model each
+   (`haiku`, `sonnet` or `opus`), and then `finish_work_item`;
 2. **groups**: one session per group, in order; its tickets move to
    **In Progress** when it starts and **Finished** on `finish_work_item`;
 3. **pull_requests**: one session opens the pull requests; skipped for
@@ -61,6 +62,10 @@ A group lists Plane keys; a key covers its open sub-tickets, and every open
 leaf must be covered exactly once. Groups are fixed once the first one
 started: moving the item back to **Todo** clears them and plans again. An
 item without open children runs one session, as before.
+
+Claude Code runs the planning session and a single session on `opus`, each
+group on its own model and the pull-request session on `sonnet`; OpenCode
+always runs on its own model.
 
 ## MCP tools
 
@@ -77,7 +82,7 @@ Workspaces reach
   task: the next batch group or the pull-request session follows, or the
   item moves to **Needs Review** if it opened a pull request, else to
   **Finished**.
-- `set_batch_groups { groups: [{ name, skill, instructions, items }] }`
+- `set_batch_groups { groups: [{ name, model, skill, instructions, items }] }`
   saves the batch groups, in the planning session only.
 - `create_pull_request { repository, head, base, title, body, draft }` opens
   a pull request from a branch the item owns and links it on the item.
@@ -114,9 +119,9 @@ body acknowledges it.
 
 `GET /sessions/current` on the MCP port, served to workspace pods only,
 returns the batch session the workspace should run: the prompt as text, with
-`X-Session-Id` (changes when a new session must start) and `X-Session-Phase`,
-or `204` for an item without batch groups or a workspace not started from
-one. Read from SQLite only.
+`X-Session-Id` (changes when a new session must start), `X-Session-Phase`
+and `X-Session-Model` (empty for OpenCode), or `204` for an item without
+batch groups or a workspace not started from one. Read from SQLite only.
 
 ## Attachments
 
