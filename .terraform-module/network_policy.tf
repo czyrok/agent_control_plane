@@ -86,3 +86,43 @@ resource "kubernetes_network_policy_v1" "agent_control_plane_ingress" {
 
   depends_on = [ var.wait_for ]
 }
+
+resource "kubernetes_network_policy_v1" "agent_control_plane_to_agent_gatekeeper" {
+  count = var.gatekeeper == null ? 0 : 1
+
+  metadata {
+    name      = "agent-control-plane-to-agent-gatekeeper"
+    namespace = var.gatekeeper.namespace_name
+  }
+
+  spec {
+    pod_selector {
+      match_labels = var.gatekeeper.pod_labels
+    }
+
+    policy_types = ["Ingress"]
+
+    ingress {
+      from {
+        namespace_selector {
+          match_labels = {
+            "kubernetes.io/metadata.name" = var.namespace_name
+          }
+        }
+
+        pod_selector {
+          match_labels = {
+            app = local.name
+          }
+        }
+      }
+
+      ports {
+        port     = tostring(var.gatekeeper.port)
+        protocol = "TCP"
+      }
+    }
+  }
+
+  depends_on = [ var.wait_for ]
+}

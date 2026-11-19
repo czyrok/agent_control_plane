@@ -135,8 +135,11 @@ only by the dashboard namespace:
 
 | Request | Answer |
 | --- | --- |
-| `GET /waiting` | `{items: [{name, label, url}]}` of unanswered questions whose item is still in **Waiting** |
+| `GET /waiting` | `{items: [{name, label, url}]}`: unanswered questions whose item is still in **Waiting**, then the gatekeeper's pending and stalled egress requests |
 | `GET /health` | `ok` |
+
+With `GATEKEEPER_URL` set, the module adds a NetworkPolicy in the gatekeeper's
+namespace admitting these pods on its page port.
 
 Links, questions, batch groups and owned branches and pull requests live in
 SQLite at `DATABASE_PATH`.
@@ -201,6 +204,8 @@ skips the wait.
 | `NTFY_TOKEN` | ntfy token allowed to publish there |
 | `GITHUB_TOKEN` | Fine-grained PAT, Contents and Pull requests write on the agent repositories; empty disables `/git/` and the pull request tools |
 | `NOTIFICATION_EMAIL` | Address ntfy also emails; empty sends none |
+| `GATEKEEPER_URL` | In-cluster gatekeeper page URL; empty lists no egress request |
+| `GATEKEEPER_PUBLIC_URL` | Gatekeeper URL used in the request links |
 | `NODE_EXTRA_CA_CERTS` | The ServiceAccount `ca.crt`, to trust the API server |
 
 The Terraform module in `.terraform-module/` sets all of them.

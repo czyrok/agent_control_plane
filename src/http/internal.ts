@@ -1,12 +1,12 @@
 import type { IncomingMessage, ServerResponse } from "node:http"
-import { listWaitingQuestions } from "../use-cases/questions.ts"
+import { listWaiting } from "../use-cases/waiting.ts"
 import { sendJson } from "./body.ts"
 
 export async function handleInternal(request: IncomingMessage, response: ServerResponse): Promise<void> {
   const path = new URL(request.url ?? "/", "http://localhost").pathname
   try {
     if (request.method === "GET") {
-      if (path === "/waiting") return sendJson(response, 200, { items: await listWaitingQuestions() })
+      if (path === "/waiting") return sendJson(response, 200, { items: await listWaiting() })
       if (path === "/health") {
         response.writeHead(200, { "Content-Type": "text/plain" }).end("ok")
         return
