@@ -57,6 +57,7 @@ resource "kubernetes_secret_v1" "agent_control_plane" {
   data = {
     plane_admin_password = var.plane_admin_password
     ntfy_token           = var.ntfy_token
+    github_token         = var.github_token
   }
 
   depends_on = [ var.wait_for ]
@@ -115,7 +116,7 @@ resource "kubernetes_deployment_v1" "agent_control_plane" {
         }
 
         annotations = {
-          secret_hash = sha256(jsonencode([var.plane_admin_password, var.ntfy_token]))
+          secret_hash = sha256(jsonencode([var.plane_admin_password, var.ntfy_token, var.github_token]))
         }
       }
 
@@ -264,6 +265,16 @@ resource "kubernetes_deployment_v1" "agent_control_plane" {
               secret_key_ref {
                 name = kubernetes_secret_v1.agent_control_plane.metadata[0].name
                 key  = "ntfy_token"
+              }
+            }
+          }
+
+          env {
+            name = "GITHUB_TOKEN"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret_v1.agent_control_plane.metadata[0].name
+                key  = "github_token"
               }
             }
           }

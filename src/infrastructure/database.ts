@@ -37,6 +37,20 @@ database.exec(`
     member_id TEXT NOT NULL,
     PRIMARY KEY (item_id, member_id)
   );
+  CREATE TABLE IF NOT EXISTS owned_branches (
+    repository TEXT NOT NULL,
+    branch TEXT NOT NULL,
+    item_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (repository, branch)
+  );
+  CREATE TABLE IF NOT EXISTS owned_pull_requests (
+    repository TEXT NOT NULL,
+    number INTEGER NOT NULL,
+    item_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (repository, number)
+  );
 `)
 
 const questionColumns = database.prepare("PRAGMA table_info(questions)").all() as { name: string }[]

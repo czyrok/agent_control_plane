@@ -29,5 +29,5 @@ export function buildGroupPrompt(item: WorkItem, group: BatchGroup & { keys: str
 }
 
 export function buildPullRequestPrompt(item: WorkItem): string {
-  return `${opening(item)}\n\nEvery batch group is finished. Make sure every branch is pushed, then open the pull requests, one per repository and branch, against the base branch, each listing the tickets it closes. Then call finish_work_item with their links.`
+  return `${opening(item)}\n\nEvery batch group is finished. Make sure every branch is pushed, then open the pull requests with create_pull_request, one per repository and branch, against the base branch, each listing the tickets it closes. Then call finish_work_item with their links.`
 }

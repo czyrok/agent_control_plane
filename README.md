@@ -3,8 +3,8 @@
 Syncs Plane work items with Coder agent workspaces: starts a workspace for
 each ready item, writes the link back, keeps it in step with the item's
 state, runs an item's children as batch groups, and serves the agent's Plane
-tools and questions to the operator over MCP. It is the only service holding
-a Plane API key.
+and pull request tools and questions to the operator over MCP. It is the only
+service holding a Plane API key or the GitHub token.
 
 ## Sync
 
@@ -72,6 +72,12 @@ Workspaces reach
   item moves to **Finished**.
 - `set_batch_groups { groups: [{ name, skill, instructions, items }] }`
   saves the batch groups, in the planning session only.
+- `create_pull_request { repository, head, base, title, body, draft }` opens
+  a pull request from a branch the item owns.
+- `list_pull_requests {}`, `get_pull_request { repository, number }`,
+  `update_pull_request { repository, number, title, body, base, state }` and
+  `comment_pull_request { repository, number, body }` reach only the pull
+  requests the item opened; `state: closed` closes one.
 - `ask_operator { question }` comments the question on the item as
   "Question from the agent", moves it to **Waiting**, publishes
   `Question on <key>` to ntfy on `NTFY_TOPIC` (`agent-questions`) with a link
@@ -103,6 +109,20 @@ returns the batch session the workspace should run: the prompt as text, with
 or `204` for an item without batch groups or a workspace not started from
 one. Read from SQLite only.
 
+## GitHub
+
+Workspaces hold no GitHub token. Their git rewrites
+`https://github.com/` to `/git/` on the MCP port, which proxies git
+smart-HTTP to GitHub with `GITHUB_TOKEN`, for `AGENT_REPOSITORIES` only:
+
+- clone and fetch pass through, from any workspace;
+- a push may create a branch nobody owns, which the item then owns, and may
+  update, force or delete only branches the item owns; its feature branch is
+  always its own; tags and other refs are refused;
+- a refused push gets `403` with the reason, before GitHub is contacted.
+
+Owned branches and pull requests stay with the item, deleted or not.
+
 ## Internal API
 
 On `http://agent-control-plane.coder.svc.cluster.local` (port 4332), reached
@@ -113,7 +133,8 @@ only by the dashboard namespace:
 | `GET /waiting` | `{items: [{name, url}]}` of unanswered questions |
 | `GET /health` | `ok` |
 
-Links, questions and batch groups live in SQLite at `DATABASE_PATH`.
+Links, questions, batch groups and owned branches and pull requests live in
+SQLite at `DATABASE_PATH`.
 
 ## Develop
 
@@ -150,7 +171,7 @@ kubectl -n coder rollout restart deployment agent-control-plane
 
 | Variable | Value |
 | --- | --- |
-| `MCP_PORT` | Port serving `/mcp`, `/answers/next` and `/sessions/current`, `4331` |
+| `MCP_PORT` | Port serving `/mcp`, `/answers/next`, `/sessions/current` and `/git/`, `4331` |
 | `INTERNAL_PORT` | Port of the internal API, `4332` |
 | `DATABASE_PATH` | SQLite file, on the data volume |
 | `WORKSPACES_NAMESPACE` | Namespace of the workspace pods allowed on `/mcp` |
@@ -170,6 +191,7 @@ kubectl -n coder rollout restart deployment agent-control-plane
 | `NTFY_URL` | ntfy server questions are published to; empty sends no notification |
 | `NTFY_TOPIC` | Its topic, `agent-questions` |
 | `NTFY_TOKEN` | ntfy token allowed to publish there |
+| `GITHUB_TOKEN` | Fine-grained PAT, Contents and Pull requests write on the agent repositories; empty disables `/git/` and the pull request tools |
 | `NOTIFICATION_EMAIL` | Address ntfy also emails; empty sends none |
 | `NODE_EXTRA_CA_CERTS` | The ServiceAccount `ca.crt`, to trust the API server |
 
