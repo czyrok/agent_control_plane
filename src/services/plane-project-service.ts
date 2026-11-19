@@ -5,7 +5,7 @@ import type { PlaneLabel, PlaneState, WorkItem } from "../shared/types.ts"
 const CATALOG_LIFETIME_MILLISECONDS = 300_000
 
 const AGENTS: Record<string, string> = { "agent/claude_code": "claude-code", "agent/opencode": "opencode" }
-const SCOPES: Record<string, Scope> = { "scope/research": "research", "scope/spec": "spec" }
+const SCOPES: Record<string, Scope> = { "issue_type/research": "research", "issue_type/spec": "spec" }
 const BRANCH_PREFIXES: Record<string, string> = {
   "kind/feature": "feat",
   "kind/fix": "fix",
