@@ -114,8 +114,8 @@ one. Read from SQLite only.
 
 ## GitHub
 
-Workspaces hold no GitHub token. Their git rewrites
-`https://github.com/` to `/git/` on the MCP port, which proxies git
+Workspaces hold no GitHub token. Their git rewrites GitHub's HTTPS and SSH
+URLs to `/git/` on the MCP port, which proxies git
 smart-HTTP to GitHub with `GITHUB_TOKEN`, for `AGENT_REPOSITORIES` only:
 
 - clone and fetch pass through, from any workspace;
@@ -167,8 +167,11 @@ By hand, from the lyre devShell, with the local registry proxy running:
 
 ```bash
 cargo make registry-image
-kubectl -n coder rollout restart deployment agent-control-plane
 ```
+
+Keel polls the tag every minute and rolls the Deployment when its digest
+changes. `kubectl -n coder rollout restart deployment agent-control-plane`
+skips the wait.
 
 ## Environment
 
