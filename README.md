@@ -167,8 +167,11 @@ By hand, from the lyre devShell, with the local registry proxy running:
 
 ```bash
 cargo make registry-image
-kubectl -n coder rollout restart deployment agent-control-plane
 ```
+
+Keel polls the tag every minute and rolls the Deployment when its digest
+changes. `kubectl -n coder rollout restart deployment agent-control-plane`
+skips the wait.
 
 ## Environment
 
