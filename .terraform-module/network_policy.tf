@@ -82,6 +82,25 @@ resource "kubernetes_network_policy_v1" "agent_control_plane_ingress" {
         }
       }
     }
+
+    dynamic "ingress" {
+      for_each = var.health_check_namespace_name == "" ? [] : [var.health_check_namespace_name]
+
+      content {
+        from {
+          namespace_selector {
+            match_labels = {
+              "kubernetes.io/metadata.name" = ingress.value
+            }
+          }
+        }
+
+        ports {
+          port     = tostring(local.internal_port)
+          protocol = "TCP"
+        }
+      }
+    }
   }
 
   depends_on = [ var.wait_for ]

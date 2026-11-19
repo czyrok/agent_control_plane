@@ -150,7 +150,8 @@ Owned branches and pull requests stay with the item, deleted or not.
 ## Internal API
 
 On `http://agent-control-plane.coder.svc.cluster.local` (port 4332), reached
-only by the dashboard namespace:
+only by the dashboard namespace (`dashboard_namespace_name`) and the health
+checker's (`health_check_namespace_name`):
 
 | Request | Answer |
 | --- | --- |
