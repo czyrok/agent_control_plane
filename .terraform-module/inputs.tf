@@ -99,6 +99,12 @@ variable "dashboard_namespace_name" {
   description = "Namespace whose pods may read the internal API. Empty admits none"
 }
 
+variable "health_check_namespace_name" {
+  type        = string
+  default     = ""
+  description = "Namespace whose pods may probe the health endpoint. Empty admits none"
+}
+
 variable "gatekeeper" {
   type = object({
     internal_url   = string
