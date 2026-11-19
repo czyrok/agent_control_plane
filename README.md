@@ -52,7 +52,8 @@ agent in the same workspace:
    **In Progress** when it starts and **Finished** on `finish_work_item`;
 3. **pull_requests**: one session opens the pull requests; skipped for
    `Research` and `Spec` items;
-4. **done**: the item is **Finished**.
+4. **done**: the item and every grouped ticket are **Needs Review** when
+   the item opened a pull request, else the item is **Finished**.
 
 A group lists Plane keys; a key covers its open sub-tickets, and every open
 leaf must be covered exactly once. Groups are fixed once the first one
@@ -72,7 +73,8 @@ Workspaces reach
 - `add_comment { body }` posts Markdown on the item.
 - `finish_work_item { summary }` posts the summary and ends the session's
   task: the next batch group or the pull-request session follows, or the
-  item moves to **Finished**.
+  item moves to **Needs Review** if it opened a pull request, else to
+  **Finished**.
 - `set_batch_groups { groups: [{ name, skill, instructions, items }] }`
   saves the batch groups, in the planning session only.
 - `create_pull_request { repository, head, base, title, body, draft }` opens

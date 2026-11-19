@@ -1,4 +1,5 @@
 import * as batchGroupRepository from "../repositories/batch-group-repository.ts"
+import * as githubOwnershipRepository from "../repositories/github-ownership-repository.ts"
 import * as planeWorkItemRepository from "../repositories/plane-work-item-repository.ts"
 import * as workItemWorkspaceRepository from "../repositories/work-item-workspace-repository.ts"
 import { buildGroupPrompt, buildPlanningPrompt, buildPullRequestPrompt } from "../services/agent-prompt-service.ts"
@@ -87,10 +88,20 @@ async function startGroup(link: WorkItemWorkspace, item: WorkItem, items: WorkIt
   return `Session finished. Stop now: batch group ${position + 1} of ${groups.length}, "${group.name}", starts in a new session.`
 }
 
+async function closeItem(link: WorkItemWorkspace): Promise<string> {
+  if (githubOwnershipRepository.listPullRequests(link.itemId).length === 0) {
+    await setStates([link.itemId], "finished")
+    return `${link.itemKey} moved to Finished.`
+  }
+  const memberIds = batchGroupRepository.listByItem(link.itemId).flatMap((group) => group.memberIds)
+  await setStates([link.itemId, ...memberIds], "needs_review")
+  return `${link.itemKey} moved to Needs Review.`
+}
+
 async function finishItem(link: WorkItemWorkspace): Promise<string> {
-  await setStates([link.itemId], "finished")
+  const result = await closeItem(link)
   workItemWorkspaceRepository.markDone(link.itemId)
-  return `${link.itemKey} moved to Finished.`
+  return result
 }
 
 async function afterLastGroup(link: WorkItemWorkspace, item: WorkItem): Promise<string> {
@@ -105,13 +116,12 @@ export async function finishSession(workspace: string, summary: string): Promise
   switch (link.phase) {
     case "single":
       await comment(link.itemId, `**Summary from the agent**\n\n${summary}`)
-      await setStates([link.itemId], "finished")
-      return `${link.itemKey} moved to Finished.`
+      return closeItem(link)
     case "pull_requests":
       await comment(link.itemId, `**Summary from the agent**\n\n${summary}`)
       return finishItem(link)
     case "done":
-      return "Nothing left to finish: the work item is already Finished."
+      return "Nothing left to finish: the work item is already closed."
   }
   const items = await planeWorkItemRepository.listWorkItems()
   const item = items.find((candidate) => candidate.id === link.itemId)

@@ -51,7 +51,7 @@ const TOOLS = [
   {
     name: "finish_work_item",
     description:
-      "Post your summary and end this session's task: the next batch group, the pull-request session, or moving the item to Finished follows. Call it once the session's task is done.",
+      "Post your summary and end this session's task: the next batch group, the pull-request session, or moving the item to Needs Review (pull requests opened) or Finished follows. Call it once the session's task is done.",
     inputSchema: {
       type: "object",
       properties: { summary: { type: "string", description: "Markdown: what was done, links to the pull requests" } },
