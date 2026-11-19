@@ -5,7 +5,7 @@ import * as planeWorkItemRepository from "../repositories/plane-work-item-reposi
 import * as workItemWorkspaceRepository from "../repositories/work-item-workspace-repository.ts"
 import { buildPlanningPrompt, buildPrompt } from "../services/agent-prompt-service.ts"
 import * as planeProjectService from "../services/plane-project-service.ts"
-import { PLANNING_MODEL, sessionModel, SINGLE_MODEL } from "../shared/models.ts"
+import { modelLabelKey, PLANNING_MODEL, sessionModel, SINGLE_MODEL } from "../shared/models.ts"
 import type { PlaneMember, WorkItem } from "../shared/types.ts"
 
 const BRANCH_MAX_LENGTH = 60
@@ -88,7 +88,11 @@ async function start(item: WorkItem, agent: string, itemsById: Map<string, WorkI
     `${env("CODER_PUBLIC_URL")}/@${workspace.ownerName}/${workspace.name}`,
     "Coder workspace",
   )
-  await planeWorkItemRepository.setState(item.id, inProgress)
+  await planeWorkItemRepository.setState(
+    item.id,
+    inProgress,
+    await planeProjectService.withModelLabel(item, modelLabelKey(agent, model)),
+  )
 }
 
 export async function startReadyWorkItems(items: WorkItem[]): Promise<void> {

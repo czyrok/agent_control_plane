@@ -4,7 +4,7 @@ import * as planeWorkItemRepository from "../repositories/plane-work-item-reposi
 import * as workItemWorkspaceRepository from "../repositories/work-item-workspace-repository.ts"
 import { buildGroupPrompt, buildPlanningPrompt, buildPullRequestPrompt } from "../services/agent-prompt-service.ts"
 import * as planeProjectService from "../services/plane-project-service.ts"
-import { isClaudeModel, PLANNING_MODEL, PULL_REQUEST_MODEL, sessionModel } from "../shared/models.ts"
+import { isClaudeModel, modelLabelKey, PLANNING_MODEL, PULL_REQUEST_MODEL, sessionModel } from "../shared/models.ts"
 import type { BatchGroupInput, SessionPhase, WorkItem, WorkItemWorkspace } from "../shared/types.ts"
 import { comment } from "./work-item-tools.ts"
 
@@ -94,7 +94,14 @@ async function startGroup(link: WorkItemWorkspace, item: WorkItem, items: WorkIt
   const groups = batchGroupRepository.listByItem(link.itemId)
   const group = groups[position]
   const agent = await planeProjectService.agentOf(item)
-  await setStates(group.memberIds, "in_progress")
+  const inProgress = await planeProjectService.stateIdByKey("in_progress")
+  for (const memberId of group.memberIds) {
+    const member = items.find((candidate) => candidate.id === memberId)
+    const labels = member
+      ? await planeProjectService.withModelLabel(member, modelLabelKey(agent, group.model))
+      : undefined
+    await planeWorkItemRepository.setState(memberId, inProgress, labels)
+  }
   batchGroupRepository.markStatus(link.itemId, position, "in_progress")
   const keyOf = new Map(items.map((candidate) => [candidate.id, candidate.key]))
   const keys = group.memberIds.map((id) => keyOf.get(id) ?? id)

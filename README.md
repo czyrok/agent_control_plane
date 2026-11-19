@@ -22,7 +22,8 @@ Every 30 s it reads the project's work items and:
   `Hotfix`, `Refactor`, `Chore`, `Docs`) and is `feat` without one, with the
   item's `Repository` labels (else its nearest ancestor's) and a prompt built for
   the item's `Issue Type` (`Research` and `Spec` items open no pull requests);
-- adds a "Coder workspace" link on the item and moves it to **In Progress**;
+- adds a "Coder workspace" link on the item and moves it to **In Progress**
+  with the `Model` label of its first session;
 - moves an item from **Waiting** back to **In Progress** on the first comment
   not posted by this service after a question;
 - acts on a linked item only when its state changed since the last tick:
@@ -40,7 +41,7 @@ Every 30 s it reads the project's work items and:
 
 States and labels are found by the `external_id` Plane provisioning stamps
 on them (`todo`, `waiting`, `agent/claude_code`, `issue_type/spec`,
-`kind/fix`, …), never by name.
+`kind/fix`, `model/opus`, …), never by name.
 
 ## Batch groups
 
@@ -65,7 +66,9 @@ item without open children runs one session, as before.
 
 Claude Code runs the planning session and a single session on `opus`, each
 group on its own model and the pull-request session on `sonnet`; OpenCode
-always runs on its own model.
+always runs on its own model. A session stamps its `Model` label (`Opus`,
+`Sonnet`, `Haiku`, `DeepSeek V4.1 Flash`) on the tickets it works: the item
+for planning and single sessions, the group's tickets when a group starts.
 
 ## MCP tools
 

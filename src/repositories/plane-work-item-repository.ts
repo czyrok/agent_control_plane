@@ -181,8 +181,11 @@ export async function addLink(itemId: string, url: string, title: string): Promi
   await planeRequest("POST", `${await projectPath()}/issues/${itemId}/links/`, { url, title })
 }
 
-export async function setState(itemId: string, stateId: string): Promise<void> {
-  await planeRequest("PATCH", `${await projectPath()}/issues/${itemId}/`, { state: stateId })
+export async function setState(itemId: string, stateId: string, labelIds?: string[]): Promise<void> {
+  await planeRequest("PATCH", `${await projectPath()}/issues/${itemId}/`, {
+    state: stateId,
+    ...(labelIds ? { labels: labelIds } : {}),
+  })
 }
 
 export async function listAttachments(itemId: string): Promise<PlaneAttachment[]> {
