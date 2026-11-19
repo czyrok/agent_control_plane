@@ -14,7 +14,9 @@ Every 30 s it reads the project's work items and:
   (`Claude Code` or `OpenCode`) whose blockers are all **Merged**, lowest
   number first, while fewer than `MAX_RUNNING_WORKSPACES` workspaces run;
 - creates it for the item's first assignee, as the Coder user with the same
-  email, else for Coder's admin;
+  email, else for Coder's admin; the assignee's Plane name and email become
+  the workspace's git identity (`git_user_name`, `git_user_email`), else the
+  Coder owner's;
 - names it `lyre-<n>`, on branch `<type>/lyre-<n>-<title slug>`, where
   `<type>` comes from the item's `Kind` label (`Feature` → `feat`, `Fix`,
   `Hotfix`, `Refactor`, `Chore`, `Docs`) and is `feat` without one, with the

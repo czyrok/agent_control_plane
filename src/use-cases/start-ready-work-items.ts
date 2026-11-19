@@ -5,7 +5,7 @@ import * as planeWorkItemRepository from "../repositories/plane-work-item-reposi
 import * as workItemWorkspaceRepository from "../repositories/work-item-workspace-repository.ts"
 import { buildPlanningPrompt, buildPrompt } from "../services/agent-prompt-service.ts"
 import * as planeProjectService from "../services/plane-project-service.ts"
-import type { WorkItem } from "../shared/types.ts"
+import type { PlaneMember, WorkItem } from "../shared/types.ts"
 
 const BRANCH_MAX_LENGTH = 60
 
@@ -31,11 +31,10 @@ function hasLiveWorkspace(item: WorkItem): boolean {
   return link !== undefined && link.deletedAt === null
 }
 
-async function ownerOf(item: WorkItem): Promise<string> {
+async function assigneeOf(item: WorkItem): Promise<PlaneMember | undefined> {
   const [first] = item.assigneeIds
-  if (!first) return "me"
-  const email = (await planeWorkItemRepository.listMemberEmails()).get(first)
-  return (email && (await findUserByEmail(email))) || "me"
+  if (!first) return undefined
+  return (await planeWorkItemRepository.listMembers()).get(first)
 }
 
 async function hasBatchableDescendant(item: WorkItem, itemsById: Map<string, WorkItem>): Promise<boolean> {
@@ -52,12 +51,16 @@ async function start(item: WorkItem, agent: string, itemsById: Map<string, WorkI
   const phase = (await hasBatchableDescendant(item, itemsById)) ? "planning" : "single"
   const prompt =
     phase === "planning" ? buildPlanningPrompt(item) : buildPrompt(item, await planeProjectService.scopeOf(item))
-  const workspace = await createWorkspace(await ownerOf(item), name, await findTemplateId(env("CODER_TEMPLATE")), {
+  const assignee = await assigneeOf(item)
+  const owner = (assignee && (await findUserByEmail(assignee.email))) || "me"
+  const workspace = await createWorkspace(owner, name, await findTemplateId(env("CODER_TEMPLATE")), {
     repositories: JSON.stringify(await planeProjectService.repositoriesOf(item, itemsById)),
     base_branch: "main",
     feature_branch: branch,
     agent,
     feature: prompt,
+    git_user_name: assignee?.name ?? "",
+    git_user_email: assignee?.email ?? "",
   })
   const inProgress = await planeProjectService.stateIdByKey("in_progress")
   workItemWorkspaceRepository.insert({

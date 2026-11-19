@@ -16,6 +16,8 @@ export type PlaneLabel = { id: string; name: string; parentId: string | null; ex
 
 export type PlaneComment = { id: string; text: string; externalSource: string | null; createdAt: string }
 
+export type PlaneMember = { email: string; name: string }
+
 export type WorkItemWorkspace = {
   itemId: string
   itemKey: string
