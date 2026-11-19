@@ -22,6 +22,21 @@ database.exec(`
     answered_at TEXT,
     delivered_at TEXT
   );
+  CREATE TABLE IF NOT EXISTS batch_groups (
+    item_id TEXT NOT NULL,
+    position INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    skill TEXT NOT NULL,
+    instructions TEXT NOT NULL,
+    status TEXT NOT NULL,
+    PRIMARY KEY (item_id, position)
+  );
+  CREATE TABLE IF NOT EXISTS batch_group_items (
+    item_id TEXT NOT NULL,
+    position INTEGER NOT NULL,
+    member_id TEXT NOT NULL,
+    PRIMARY KEY (item_id, member_id)
+  );
 `)
 
 const questionColumns = database.prepare("PRAGMA table_info(questions)").all() as { name: string }[]
@@ -35,6 +50,11 @@ const linkColumns = new Set(
   (database.prepare("PRAGMA table_info(work_item_workspaces)").all() as { name: string }[]).map((column) => column.name),
 )
 for (const [column, definition] of [
+  ["branch", "TEXT NOT NULL DEFAULT ''"],
+  ["phase", "TEXT NOT NULL DEFAULT 'single'"],
+  ["current_group", "INTEGER"],
+  ["session_revision", "INTEGER NOT NULL DEFAULT 0"],
+  ["session_prompt", "TEXT NOT NULL DEFAULT ''"],
   ["synced_state_id", "TEXT"],
   ["deleted_at", "TEXT"],
 ]) {

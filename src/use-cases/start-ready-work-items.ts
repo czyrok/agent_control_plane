@@ -3,7 +3,7 @@ import { env } from "../infrastructure/env.ts"
 import { PlaneRateLimitedError } from "../infrastructure/plane.ts"
 import * as planeWorkItemRepository from "../repositories/plane-work-item-repository.ts"
 import * as workItemWorkspaceRepository from "../repositories/work-item-workspace-repository.ts"
-import { buildPrompt } from "../services/agent-prompt-service.ts"
+import { buildPlanningPrompt, buildPrompt } from "../services/agent-prompt-service.ts"
 import * as planeProjectService from "../services/plane-project-service.ts"
 import type { WorkItem } from "../shared/types.ts"
 
@@ -38,16 +38,26 @@ async function ownerOf(item: WorkItem): Promise<string> {
   return (email && (await findUserByEmail(email))) || "me"
 }
 
+async function hasBatchableDescendant(item: WorkItem, itemsById: Map<string, WorkItem>): Promise<boolean> {
+  for (const descendant of planeWorkItemRepository.descendantsOf(item.id, [...itemsById.values()])) {
+    if (await planeProjectService.isBatchable(descendant)) return true
+  }
+  return false
+}
+
 async function start(item: WorkItem, agent: string, itemsById: Map<string, WorkItem>): Promise<void> {
   const name = item.key.toLowerCase()
   const prefix = await planeProjectService.branchPrefixOf(item)
   const branch = `${prefix}/${name}-${slug(item.name)}`.slice(0, BRANCH_MAX_LENGTH).replace(/-+$/, "")
+  const phase = (await hasBatchableDescendant(item, itemsById)) ? "planning" : "single"
+  const prompt =
+    phase === "planning" ? buildPlanningPrompt(item) : buildPrompt(item, await planeProjectService.scopeOf(item))
   const workspace = await createWorkspace(await ownerOf(item), name, await findTemplateId(env("CODER_TEMPLATE")), {
     repositories: JSON.stringify(await planeProjectService.repositoriesOf(item, itemsById)),
     base_branch: "main",
     feature_branch: branch,
     agent,
-    feature: buildPrompt(item, await planeProjectService.scopeOf(item)),
+    feature: prompt,
   })
   const inProgress = await planeProjectService.stateIdByKey("in_progress")
   workItemWorkspaceRepository.insert({
@@ -58,6 +68,11 @@ async function start(item: WorkItem, agent: string, itemsById: Map<string, WorkI
     workspaceId: workspace.id,
     createdAt: new Date().toISOString(),
     stoppedAt: null,
+    branch,
+    phase,
+    currentGroup: null,
+    sessionRevision: 1,
+    sessionPrompt: prompt,
     syncedStateId: inProgress,
     deletedAt: null,
   })

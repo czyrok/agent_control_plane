@@ -2,8 +2,9 @@
 
 Syncs Plane work items with Coder agent workspaces: starts a workspace for
 each ready item, writes the link back, keeps it in step with the item's
-state, and serves the agent's Plane tools and questions to the operator over
-MCP. It is the only service holding a Plane API key.
+state, runs an item's children as batch groups, and serves the agent's Plane
+tools and questions to the operator over MCP. It is the only service holding
+a Plane API key.
 
 ## Sync
 
@@ -27,7 +28,7 @@ Every 30 s it reads the project's work items and:
   | New state | Workspace |
   | --- | --- |
   | **In Progress**, **Waiting**, **Finished**, **Needs Review** | started if stopped |
-  | **Todo** | started if stopped, item moved to **In Progress** |
+  | **Todo** | batch reset to planning, started if stopped, item moved to **In Progress** |
   | **Backlog** | stopped |
   | **Merged**, **Cancelled**, or item deleted | open descendants moved to the same state, workspace deleted |
 
@@ -39,16 +40,38 @@ States and labels are found by the `external_id` Plane provisioning stamps
 on them (`todo`, `waiting`, `agent/claude_code`, `issue_type/spec`,
 `kind/fix`, …), never by name.
 
+## Batch groups
+
+An `Agent` item with a child not in **Finished**, **Needs Review**,
+**Merged** or **Cancelled** runs as a sequence of sessions, each a fresh
+agent in the same workspace:
+
+1. **planning**: the agent calls `set_batch_groups` (repeatable, it
+   replaces the groups) and then `finish_work_item`;
+2. **groups**: one session per group, in order; its tickets move to
+   **In Progress** when it starts and **Finished** on `finish_work_item`;
+3. **pull_requests**: one session opens the pull requests; skipped for
+   `Research` and `Spec` items;
+4. **done**: the item is **Finished**.
+
+A group lists Plane keys; a key covers its open sub-tickets, and every open
+leaf must be covered exactly once. Groups are fixed once the first one
+started: moving the item back to **Todo** clears them and plans again. An
+item without open children runs one session, as before.
+
 ## MCP tools
 
 Workspaces reach
 `http://agent-control-plane-mcp.coder.svc.cluster.local/mcp` (port 4331):
 
 - `get_work_item {}` returns the item as Markdown: description, parents with
-  their comments, children, blockers and comments.
+  their comments, the descendant tree, batch groups, blockers and comments.
 - `add_comment { body }` posts Markdown on the item.
-- `finish_work_item { summary }` posts the summary and moves the item to
-  **Finished**.
+- `finish_work_item { summary }` posts the summary and ends the session's
+  task: the next batch group or the pull-request session follows, or the
+  item moves to **Finished**.
+- `set_batch_groups { groups: [{ name, skill, instructions, items }] }`
+  saves the batch groups, in the planning session only.
 - `ask_operator { question }` comments the question on the item as
   "Question from the agent", moves it to **Waiting**, publishes
   `Question on <key>` to ntfy on `NTFY_TOPIC` (`agent-questions`) with a link
@@ -72,6 +95,14 @@ The workspace delivers an answer into the agent's session itself, through
 `X-Item-Key`, or `204`; it serves the same answer until `POST` with that id as
 body acknowledges it.
 
+## Sessions
+
+`GET /sessions/current` on the MCP port, served to workspace pods only,
+returns the batch session the workspace should run: the prompt as text, with
+`X-Session-Id` (changes when a new session must start) and `X-Session-Phase`,
+or `204` for an item without batch groups or a workspace not started from
+one. Read from SQLite only.
+
 ## Internal API
 
 On `http://agent-control-plane.coder.svc.cluster.local` (port 4332), reached
@@ -82,7 +113,7 @@ only by the dashboard namespace:
 | `GET /waiting` | `{items: [{name, url}]}` of unanswered questions |
 | `GET /health` | `ok` |
 
-Links and questions live in SQLite at `DATABASE_PATH`.
+Links, questions and batch groups live in SQLite at `DATABASE_PATH`.
 
 ## Develop
 
@@ -119,7 +150,7 @@ kubectl -n coder rollout restart deployment agent-control-plane
 
 | Variable | Value |
 | --- | --- |
-| `MCP_PORT` | Port serving only `/mcp` and `/answers/next`, `4331` |
+| `MCP_PORT` | Port serving `/mcp`, `/answers/next` and `/sessions/current`, `4331` |
 | `INTERNAL_PORT` | Port of the internal API, `4332` |
 | `DATABASE_PATH` | SQLite file, on the data volume |
 | `WORKSPACES_NAMESPACE` | Namespace of the workspace pods allowed on `/mcp` |

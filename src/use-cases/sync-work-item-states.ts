@@ -4,6 +4,7 @@ import * as planeWorkItemRepository from "../repositories/plane-work-item-reposi
 import * as workItemWorkspaceRepository from "../repositories/work-item-workspace-repository.ts"
 import * as planeProjectService from "../services/plane-project-service.ts"
 import type { WorkItem, WorkItemWorkspace } from "../shared/types.ts"
+import { resetBatch } from "./batch-groups.ts"
 
 const CLOSED_GROUPS = new Set(["completed", "cancelled"])
 
@@ -43,6 +44,7 @@ export async function syncWorkItemStates(items: WorkItem[]): Promise<void> {
         workItemWorkspaceRepository.clearStopped(link.itemId)
       }
       if (group === "unstarted") {
+        await resetBatch(link, items)
         syncedStateId = await planeProjectService.stateIdByKey("in_progress")
         await planeWorkItemRepository.setState(item.id, syncedStateId)
       }

@@ -1,6 +1,7 @@
+import * as batchGroupRepository from "../repositories/batch-group-repository.ts"
 import * as planeWorkItemRepository from "../repositories/plane-work-item-repository.ts"
 import { COMMENT_SOURCE } from "../repositories/plane-work-item-repository.ts"
-import type { WorkItem } from "../shared/types.ts"
+import type { SessionPhase, WorkItem } from "../shared/types.ts"
 import * as planeProjectService from "./plane-project-service.ts"
 
 async function heading(item: WorkItem, level: string): Promise<string> {
@@ -35,13 +36,26 @@ function ancestors(item: WorkItem, itemsById: Map<string, WorkItem>): WorkItem[]
   return found
 }
 
-export async function describeWorkItem(itemId: string): Promise<string | undefined> {
+async function childLines(parentId: string, items: WorkItem[], depth: number, visited: Set<string>): Promise<string[]> {
+  const lines: string[] = []
+  for (const child of items.filter((candidate) => candidate.parentId === parentId && !visited.has(candidate.id))) {
+    visited.add(child.id)
+    const state = (await planeProjectService.stateName(child.stateId)) ?? "unknown state"
+    lines.push(`${"  ".repeat(depth)}- ${child.key} — ${child.name} (${state})`)
+    lines.push(...(await childLines(child.id, items, depth + 1, visited)))
+  }
+  return lines
+}
+
+export async function describeWorkItem(itemId: string, phase?: SessionPhase): Promise<string | undefined> {
   const items = await planeWorkItemRepository.listWorkItems()
   const itemsById = new Map(items.map((item) => [item.id, item]))
   const item = itemsById.get(itemId)
   if (!item) return undefined
 
-  const sections = [await heading(item, "#"), description(item)]
+  const sections = [await heading(item, "#")]
+  if (phase && phase !== "single") sections.push(`Session: ${phase}`)
+  sections.push(description(item))
 
   const parents = ancestors(item, itemsById)
   if (parents.length > 0) {
@@ -51,14 +65,20 @@ export async function describeWorkItem(itemId: string): Promise<string | undefin
     }
   }
 
-  const children = items.filter((candidate) => candidate.parentId === item.id)
-  if (children.length > 0) {
-    const lines: string[] = []
-    for (const child of children) {
-      const state = (await planeProjectService.stateName(child.stateId)) ?? "unknown state"
-      lines.push(`- ${child.key} — ${child.name} (${state})`)
-    }
-    sections.push("## Children", lines.join("\n"))
+  const children = await childLines(item.id, items, 0, new Set([item.id]))
+  if (children.length > 0) sections.push("## Children", children.join("\n"))
+
+  const groups = batchGroupRepository.listByItem(item.id)
+  if (groups.length > 0) {
+    sections.push(
+      "## Batch groups",
+      groups
+        .map(
+          (group) =>
+            `${group.position + 1}. ${group.name} — ${group.status}${group.skill ? ` — skill ${group.skill}` : ""}\n   ${group.memberIds.map((id) => itemsById.get(id)?.key ?? id).join(", ")}${group.instructions ? `\n   ${group.instructions}` : ""}`,
+        )
+        .join("\n"),
+    )
   }
 
   const blockers = (await planeWorkItemRepository.findBlockerIds(item.id)).flatMap((id) => itemsById.get(id) ?? [])

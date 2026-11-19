@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http"
-import type { Question } from "../shared/types.ts"
+import type { BatchGroupInput, Question } from "../shared/types.ts"
+import { setBatchGroups } from "../use-cases/batch-groups.ts"
 import { askOperator, awaitAnswer } from "../use-cases/questions.ts"
 import { addWorkItemComment, finishWorkItem, getWorkItemContext } from "../use-cases/work-item-tools.ts"
 import { readBody, sendJson } from "./body.ts"
@@ -36,11 +37,36 @@ const TOOLS = [
   },
   {
     name: "finish_work_item",
-    description: "Post your summary on the Plane work item and move it to Finished. Call it once the work is done.",
+    description:
+      "Post your summary and end this session's task: the next batch group, the pull-request session, or moving the item to Finished follows. Call it once the session's task is done.",
     inputSchema: {
       type: "object",
       properties: { summary: { type: "string", description: "Markdown: what was done, links to the pull requests" } },
       required: ["summary"],
+    },
+  },
+  {
+    name: "set_batch_groups",
+    description:
+      "Planning session only: save the ordered batch groups the children of your work item run in, one session each. Calling it again replaces them.",
+    inputSchema: {
+      type: "object",
+      required: ["groups"],
+      properties: {
+        groups: {
+          type: "array",
+          items: {
+            type: "object",
+            required: ["name", "items"],
+            properties: {
+              name: { type: "string" },
+              skill: { type: "string" },
+              instructions: { type: "string" },
+              items: { type: "array", items: { type: "string", description: "Plane key, e.g. LYRE-12" } },
+            },
+          },
+        },
+      },
     },
   },
   {
@@ -72,6 +98,24 @@ function text(args: Record<string, unknown>, name: string): string {
   return typeof value === "string" ? value.trim() : ""
 }
 
+function batchGroups(args: Record<string, unknown>): BatchGroupInput[] | undefined {
+  if (!Array.isArray(args.groups)) return undefined
+  const groups: BatchGroupInput[] = []
+  for (const group of args.groups as unknown[]) {
+    if (typeof group !== "object" || group === null) return undefined
+    const fields = group as Record<string, unknown>
+    const name = text(fields, "name")
+    if (!name || !Array.isArray(fields.items) || fields.items.some((item) => typeof item !== "string")) return undefined
+    groups.push({
+      name,
+      skill: text(fields, "skill"),
+      instructions: text(fields, "instructions"),
+      items: (fields.items as string[]).map((item) => item.trim().toUpperCase()),
+    })
+  }
+  return groups
+}
+
 async function callTool(
   name: string,
   args: Record<string, unknown>,
@@ -93,6 +137,13 @@ async function callTool(
       if (!summary) return { text: "summary is empty", isError: true }
       result = await finishWorkItem(workspace, summary)
       break
+    }
+    case "set_batch_groups": {
+      const groups = batchGroups(args)
+      if (!groups || groups.length === 0) {
+        return { text: "groups must be a non-empty list of { name, skill, instructions, items }", isError: true }
+      }
+      return (await setBatchGroups(workspace, groups)) ?? { text: UNLINKED, isError: false }
     }
     case "ask_operator": {
       const question = text(args, "question")
