@@ -84,7 +84,7 @@ const TOOLS = [
   },
   {
     name: "create_pull_request",
-    description: "Open a pull request from a branch this work item created.",
+    description: "Open a pull request from a branch this work item created and link it on the work item.",
     inputSchema: {
       type: "object",
       required: ["repository", "head", "base", "title"],

@@ -1,5 +1,6 @@
 import { githubJson } from "../infrastructure/github.ts"
 import * as githubOwnershipRepository from "../repositories/github-ownership-repository.ts"
+import * as planeWorkItemRepository from "../repositories/plane-work-item-repository.ts"
 import * as workItemWorkspaceRepository from "../repositories/work-item-workspace-repository.ts"
 import { allowedRepositories, ownsBranch } from "../services/git-push-policy-service.ts"
 import type { WorkItemWorkspace } from "../shared/types.ts"
@@ -56,6 +57,7 @@ export async function createPullRequest(
     draft: input.draft,
   })
   githubOwnershipRepository.claimPullRequest(link.itemId, repository, created.number)
+  await planeWorkItemRepository.addLink(link.itemId, created.html_url, `Pull request ${repository}#${created.number}`)
   return `#${created.number} ${created.html_url}`
 }
 

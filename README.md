@@ -78,7 +78,7 @@ Workspaces reach
 - `set_batch_groups { groups: [{ name, skill, instructions, items }] }`
   saves the batch groups, in the planning session only.
 - `create_pull_request { repository, head, base, title, body, draft }` opens
-  a pull request from a branch the item owns.
+  a pull request from a branch the item owns and links it on the item.
 - `list_pull_requests {}`, `get_pull_request { repository, number }`,
   `update_pull_request { repository, number, title, body, base, state }` and
   `comment_pull_request { repository, number, body }` reach only the pull
