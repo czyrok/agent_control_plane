@@ -25,7 +25,7 @@ function description(item: WorkItem): string {
   return item.description || "_No description._"
 }
 
-function ancestors(item: WorkItem, itemsById: Map<string, WorkItem>): WorkItem[] {
+export function ancestors(item: WorkItem, itemsById: Map<string, WorkItem>): WorkItem[] {
   const found: WorkItem[] = []
   const visited = new Set([item.id])
   for (let parent = item.parentId ? itemsById.get(item.parentId) : undefined; parent && !visited.has(parent.id); ) {
@@ -34,6 +34,18 @@ function ancestors(item: WorkItem, itemsById: Map<string, WorkItem>): WorkItem[]
     parent = parent.parentId ? itemsById.get(parent.parentId) : undefined
   }
   return found
+}
+
+async function attachmentLines(item: WorkItem): Promise<string[]> {
+  return (await planeWorkItemRepository.listAttachments(item.id)).map(
+    (attachment) =>
+      `- ${attachment.name} (${attachment.mimeType}, ${attachment.size} bytes): $ATTACHMENTS_URL/${item.key}/${attachment.id}`,
+  )
+}
+
+async function attachmentsSection(item: WorkItem): Promise<string[]> {
+  const lines = await attachmentLines(item)
+  return lines.length > 0 ? ["## Attachments", lines.join("\n")] : []
 }
 
 async function childLines(parentId: string, items: WorkItem[], depth: number, visited: Set<string>): Promise<string[]> {
@@ -72,12 +84,16 @@ export async function describeWorkItem(itemId: string, phase?: SessionPhase): Pr
   const sections = [await heading(item, "#")]
   if (phase && phase !== "single") sections.push(`Session: ${phase}`)
   sections.push(description(item))
+  sections.push(...(await attachmentsSection(item)))
 
   const parents = ancestors(item, itemsById)
   if (parents.length > 0) {
     sections.push("## Parents")
     for (const parent of parents) {
-      sections.push(await heading(parent, "###"), description(parent), `Comments:\n\n${await comments(parent)}`)
+      sections.push(await heading(parent, "###"), description(parent))
+      const attachments = await attachmentLines(parent)
+      if (attachments.length > 0) sections.push(`Attachments:\n\n${attachments.join("\n")}`)
+      sections.push(`Comments:\n\n${await comments(parent)}`)
     }
   }
 
@@ -112,6 +128,7 @@ export async function describeDescendant(rootId: string, key: string): Promise<s
   const itemsById = new Map(items.map((candidate) => [candidate.id, candidate]))
 
   const sections = [await heading(item, "#"), description(item)]
+  sections.push(...(await attachmentsSection(item)))
   sections.push(...(await childrenSection(item.id, items)))
   sections.push(...(await blockersSection(item, itemsById)))
   sections.push("## Comments", await comments(item))

@@ -1,6 +1,6 @@
 import { env } from "../infrastructure/env.ts"
-import { PlaneConflictError, planeRequest } from "../infrastructure/plane.ts"
-import type { PlaneComment, PlaneLabel, PlaneMember, PlaneState, WorkItem } from "../shared/types.ts"
+import { PlaneConflictError, planeDownload, planeRequest } from "../infrastructure/plane.ts"
+import type { PlaneAttachment, PlaneComment, PlaneLabel, PlaneMember, PlaneState, WorkItem } from "../shared/types.ts"
 
 export const COMMENT_SOURCE = "agent-control-plane"
 const PROVISIONING_SOURCE = "lyre-terraform"
@@ -183,4 +183,24 @@ export async function addLink(itemId: string, url: string, title: string): Promi
 
 export async function setState(itemId: string, stateId: string): Promise<void> {
   await planeRequest("PATCH", `${await projectPath()}/issues/${itemId}/`, { state: stateId })
+}
+
+export async function listAttachments(itemId: string): Promise<PlaneAttachment[]> {
+  type Payload = { id: string; is_uploaded?: boolean; attributes: { name: string; size: number; type: string } }
+  const payload = await planeRequest<Payload[] | { results: Payload[] }>(
+    "GET",
+    `${await projectPath()}/issues/${itemId}/issue-attachments/`,
+  )
+  return (Array.isArray(payload) ? payload : payload.results)
+    .filter((attachment) => attachment.is_uploaded !== false)
+    .map((attachment) => ({
+      id: attachment.id,
+      name: attachment.attributes.name,
+      size: attachment.attributes.size,
+      mimeType: attachment.attributes.type,
+    }))
+}
+
+export async function downloadAttachment(itemId: string, attachmentId: string): Promise<Response> {
+  return planeDownload(`${await projectPath()}/issues/${itemId}/issue-attachments/${attachmentId}/`)
 }

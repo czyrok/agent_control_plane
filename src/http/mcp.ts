@@ -31,7 +31,7 @@ const TOOLS = [
   {
     name: "get_work_item",
     description:
-      "Read the Plane work item this workspace was started for: description, parents with their comments, children, blockers and comments. Call it first. Pass key (e.g. LYRE-12) to read one of its children or sub-children in full: description, children, blockers and comments.",
+      "Read the Plane work item this workspace was started for: description, parents with their comments, children, blockers and comments. Call it first. Pass key (e.g. LYRE-12) to read one of its children or sub-children in full: description, children, blockers and comments. Lists each item's attachments; download one with curl from the URL it gives.",
     inputSchema: {
       type: "object",
       properties: {

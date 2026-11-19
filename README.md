@@ -69,9 +69,9 @@ Workspaces reach
 
 - `get_work_item { key? }` returns the item as Markdown: description, parents
   with their comments, the descendant tree, batch groups, blockers and
-  comments. With `key`, it returns that child or sub-child instead:
-  description, children, blockers and comments; a key outside the item's
-  subtree is refused.
+  comments, with each item's attachments. With `key`, it returns that child
+  or sub-child instead: description, attachments, children, blockers and
+  comments; a key outside the item's subtree is refused.
 - `add_comment { body }` posts Markdown on the item.
 - `finish_work_item { summary }` posts the summary and ends the session's
   task: the next batch group or the pull-request session follows, or the
@@ -117,6 +117,13 @@ returns the batch session the workspace should run: the prompt as text, with
 `X-Session-Id` (changes when a new session must start) and `X-Session-Phase`,
 or `204` for an item without batch groups or a workspace not started from
 one. Read from SQLite only.
+
+## Attachments
+
+`GET /attachments/<KEY>/<id>` on the MCP port, served to workspace pods
+only, streams a Plane attachment with its type and file name, for the
+workspace's item, its parents and its children; `get_work_item` lists them
+with that URL. Any other key or id gets `404`.
 
 ## GitHub
 
@@ -183,7 +190,7 @@ skips the wait.
 
 | Variable | Value |
 | --- | --- |
-| `MCP_PORT` | Port serving `/mcp`, `/answers/next`, `/sessions/current` and `/git/`, `4331` |
+| `MCP_PORT` | Port serving `/mcp`, `/answers/next`, `/sessions/current`, `/attachments/` and `/git/`, `4331` |
 | `INTERNAL_PORT` | Port of the internal API, `4332` |
 | `DATABASE_PATH` | SQLite file, on the data volume |
 | `WORKSPACES_NAMESPACE` | Namespace of the workspace pods allowed on `/mcp` |
