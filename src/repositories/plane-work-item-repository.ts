@@ -87,6 +87,19 @@ export async function listWorkItems(): Promise<WorkItem[]> {
   }))
 }
 
+export async function findCurrentCycleId(): Promise<string | undefined> {
+  const cycles = await planeRequest<{ id: string }[]>("GET", `${await projectPath()}/cycles/?cycle_view=current`)
+  return cycles[0]?.id
+}
+
+export async function listCycleIds(): Promise<string[]> {
+  return (await paginate<{ id: string }>(`${await projectPath()}/cycles/`)).map((cycle) => cycle.id)
+}
+
+export async function listCycleItemIds(cycleId: string): Promise<string[]> {
+  return (await paginate<{ id: string }>(`${await projectPath()}/cycles/${cycleId}/cycle-issues/`)).map((item) => item.id)
+}
+
 export function descendantsOf(itemId: string, items: WorkItem[]): WorkItem[] {
   const found: WorkItem[] = []
   const visited = new Set([itemId])

@@ -136,6 +136,7 @@ only by the dashboard namespace:
 | Request | Answer |
 | --- | --- |
 | `GET /waiting` | `{items: [{name, label, url}]}`: unanswered questions whose item is still in **Waiting**, then the gatekeeper's pending and stalled egress requests |
+| `GET /stats` | `{total, todo, started, done}` over the work items of the current cycle and those in no cycle, from the last sync (cycle membership refreshed every 5 min); `503` before the first |
 | `GET /health` | `ok` |
 
 With `GATEKEEPER_URL` set, the module adds a NetworkPolicy in the gatekeeper's
