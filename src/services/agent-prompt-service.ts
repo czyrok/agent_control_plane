@@ -4,7 +4,7 @@ import type { Scope } from "./plane-project-service.ts"
 function opening(item: WorkItem): string {
   return `You are working on the Plane work item ${item.key} — ${item.name}.
 
-Call get_work_item first: it returns this item with its parents, children, blockers and comments. Decisions already taken live in the research and spec items and in the parents' comments it returns; follow them. Use ask_operator only for what they do not settle, and batch every question in one call. Keep anything worth keeping on the item with add_comment.`
+Call get_work_item first: it returns this item with its parents, children, blockers and comments; with a key, it returns one of its children or sub-children in full. Decisions already taken live in the research and spec items and in the parents' comments it returns; follow them. Use ask_operator only for what they do not settle, and batch every question in one call. Keep anything worth keeping on the item with add_comment.`
 }
 
 function researchTail(scope: Scope): string {
@@ -20,12 +20,12 @@ export function buildPrompt(item: WorkItem, scope: Scope | undefined): string {
 }
 
 export function buildPlanningPrompt(item: WorkItem): string {
-  return `${opening(item)}\n\nThis session only plans. Group the children and sub-children of ${item.key} that are not Finished, Needs Review, Merged or Cancelled (never batch those) into ordered batch groups that can each be done in one session, in dependency order. Give each group a short name, the skill to run it with, chosen from the skills under ~/workspace/*/.claude/skills/ (empty if none fits), extra instructions, and the keys of its tickets; listing a ticket covers its open sub-tickets. Call set_batch_groups with all of them (calling it again replaces the batch), write no code, then call finish_work_item with a summary of the plan.`
+  return `${opening(item)}\n\nThis session only plans. Group the children and sub-children of ${item.key} that are not Finished, Needs Review, Merged or Cancelled (never batch those) into ordered batch groups that can each be done in one session, in dependency order. Give each group a short name, the skill to run it with, chosen from the skills under ~/workspace/*/.claude/skills/ (empty if none fits), extra instructions, and the keys of its tickets; listing a ticket covers its open sub-tickets. Read every ticket you batch with get_work_item { key } first: its description, comments and blockers decide its group. Call set_batch_groups with all of them (calling it again replaces the batch), write no code, then call finish_work_item with a summary of the plan.`
 }
 
 export function buildGroupPrompt(item: WorkItem, group: BatchGroup & { keys: string[] }, total: number): string {
   const skill = group.skill ? `Use the ${group.skill} skill for this work. ` : ""
-  return `${opening(item)}\n\nThis session runs batch group ${group.position + 1} of ${total}, "${group.name}", covering ${group.keys.join(", ")}. get_work_item shows every group and its state. ${skill}${group.instructions}\n\nCommit on your branches and push them; open no pull request, a later session does. When this group is done, call finish_work_item with a summary: the next group starts in a new session.`
+  return `${opening(item)}\n\nThis session runs batch group ${group.position + 1} of ${total}, "${group.name}", covering ${group.keys.join(", ")}. get_work_item shows every group and its state. Read each ticket of this group with get_work_item { key } before working on it. ${skill}${group.instructions}\n\nCommit on your branches and push them; open no pull request, a later session does. When this group is done, call finish_work_item with a summary: the next group starts in a new session.`
 }
 
 export function buildPullRequestPrompt(item: WorkItem): string {
