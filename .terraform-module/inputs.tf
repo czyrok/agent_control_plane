@@ -99,6 +99,18 @@ variable "dashboard_namespace_name" {
   description = "Namespace whose pods may read the internal API. Empty admits none"
 }
 
+variable "gatekeeper" {
+  type = object({
+    internal_url   = string
+    public_url     = string
+    namespace_name = string
+    pod_labels     = map(string)
+    port           = number
+  })
+  default     = null
+  description = "Agent gatekeeper whose pending and stalled egress requests /waiting also lists. Unset lists questions only"
+}
+
 variable "storage_size" {
   type        = string
   default     = "256Mi"

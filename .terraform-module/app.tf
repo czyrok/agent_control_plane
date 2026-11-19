@@ -291,6 +291,18 @@ resource "kubernetes_deployment_v1" "agent_control_plane" {
             value = var.notification_email
           }
 
+          dynamic "env" {
+            for_each = var.gatekeeper == null ? {} : {
+              GATEKEEPER_URL        = var.gatekeeper.internal_url
+              GATEKEEPER_PUBLIC_URL = var.gatekeeper.public_url
+            }
+
+            content {
+              name  = env.key
+              value = env.value
+            }
+          }
+
           env {
             name  = "NODE_EXTRA_CA_CERTS"
             value = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"

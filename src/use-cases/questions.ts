@@ -46,7 +46,9 @@ export async function askOperator(
     answeredAt: null,
     deliveredAt: null,
   })
-  await planeWorkItemRepository.setState(link.itemId, await planeProjectService.stateIdByKey("waiting"))
+  const waitingStateId = await planeProjectService.stateIdByKey("waiting")
+  await planeWorkItemRepository.setState(link.itemId, waitingStateId)
+  workItemWorkspaceRepository.setSyncedState(link.itemId, waitingStateId)
   const item = describeItem(link)
   notifyQuestion({ itemKey: item.itemKey, itemName: item.itemName, url: item.url, question }).catch((error) =>
     console.error(error),
@@ -92,9 +94,13 @@ export async function syncQuestionAnswers(): Promise<void> {
   }
 }
 
-export function listWaiting(): { name: string; url: string }[] {
+export type WaitingItem = { name: string; label: string; url: string }
+
+export async function listWaitingQuestions(): Promise<WaitingItem[]> {
+  const waitingStateId = await planeProjectService.stateIdByKey("waiting")
   return questionRepository.findUnanswered().flatMap((question) => {
     const link = workItemWorkspaceRepository.findByItemId(question.itemId)
-    return link ? [{ name: `${link.itemKey} ${link.itemName}`, url: planeProjectService.workItemUrl(link.itemKey) }] : []
+    if (!link || link.deletedAt !== null || link.syncedStateId !== waitingStateId) return []
+    return [{ name: `${link.itemKey} ${link.itemName}`, label: "question", url: planeProjectService.workItemUrl(link.itemKey) }]
   })
 }

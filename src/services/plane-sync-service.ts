@@ -3,6 +3,7 @@ import { listWorkItems } from "../repositories/plane-work-item-repository.ts"
 import { syncQuestionAnswers } from "../use-cases/questions.ts"
 import { startReadyWorkItems } from "../use-cases/start-ready-work-items.ts"
 import { syncWorkItemStates } from "../use-cases/sync-work-item-states.ts"
+import { recordWorkItemStats } from "../use-cases/work-item-stats.ts"
 
 const INTERVAL_MILLISECONDS = 30_000
 
@@ -16,6 +17,7 @@ async function tick(): Promise<void> {
     await syncQuestionAnswers()
     await syncWorkItemStates(items)
     await startReadyWorkItems(items)
+    await recordWorkItemStats(items)
   } catch (error) {
     if (!(error instanceof PlaneRateLimitedError)) console.error("plane sync:", error)
   } finally {
