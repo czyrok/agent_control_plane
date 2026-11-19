@@ -80,6 +80,13 @@ variable "ntfy_token" {
   description = "ntfy access token allowed to publish on that topic"
 }
 
+variable "github_token" {
+  type        = string
+  sensitive   = true
+  default     = ""
+  description = "Fine-grained PAT the control plane pushes and opens pull requests with on behalf of workspaces; empty disables both"
+}
+
 variable "notification_email" {
   type        = string
   default     = ""

@@ -3,7 +3,7 @@ import { env } from "./env.ts"
 const REQUEST_TIMEOUT_MILLISECONDS = 10_000
 const ENDED_BUILD_STATUSES = new Set(["failed", "canceled", "deleted"])
 
-export type CoderWorkspace = { id: string; name: string; ownerName: string }
+export type CoderWorkspace = { id: string; name: string; ownerName: string; status: "running" | "stopped" | "other" }
 
 type WorkspacePayload = {
   id: string
@@ -51,8 +51,14 @@ async function coderJson<T>(method: string, path: string, body?: unknown): Promi
   return (await response.json()) as T
 }
 
+function statusOf({ transition, status }: WorkspacePayload["latest_build"]): CoderWorkspace["status"] {
+  if (transition === "start" && !ENDED_BUILD_STATUSES.has(status)) return "running"
+  if (transition === "stop") return "stopped"
+  return "other"
+}
+
 function toWorkspace(payload: WorkspacePayload): CoderWorkspace {
-  return { id: payload.id, name: payload.name, ownerName: payload.owner_name }
+  return { id: payload.id, name: payload.name, ownerName: payload.owner_name, status: statusOf(payload.latest_build) }
 }
 
 export async function findTemplateId(name: string): Promise<string> {
@@ -63,29 +69,48 @@ export async function findTemplateId(name: string): Promise<string> {
 }
 
 export async function createWorkspace(
+  owner: string,
   name: string,
   templateId: string,
   parameters: Record<string, string>,
 ): Promise<CoderWorkspace> {
-  const response = await coderRequest("POST", "/api/v2/users/me/workspaces", {
+  const response = await coderRequest("POST", `/api/v2/users/${owner}/workspaces`, {
     name,
     template_id: templateId,
     rich_parameter_values: Object.entries(parameters).map(([parameter, value]) => ({ name: parameter, value })),
   })
   if (response.status === 409) {
-    return toWorkspace(await coderJson<WorkspacePayload>("GET", `/api/v2/users/me/workspace/${name}`))
+    return toWorkspace(await coderJson<WorkspacePayload>("GET", `/api/v2/users/${owner}/workspace/${name}`))
   }
-  if (response.status !== 201) throw new Error(`POST /api/v2/users/me/workspaces: ${response.status}`)
+  if (response.status !== 201) throw new Error(`POST /api/v2/users/${owner}/workspaces: ${response.status}`)
   return toWorkspace((await response.json()) as WorkspacePayload)
+}
+
+export async function listWorkspaces(): Promise<CoderWorkspace[]> {
+  const { workspaces } = await coderJson<{ workspaces: WorkspacePayload[] }>("GET", "/api/v2/workspaces")
+  return workspaces.map(toWorkspace)
+}
+
+export async function startWorkspace(id: string): Promise<void> {
+  await coderJson("POST", `/api/v2/workspaces/${id}/builds`, { transition: "start" })
 }
 
 export async function stopWorkspace(id: string): Promise<void> {
   await coderJson("POST", `/api/v2/workspaces/${id}/builds`, { transition: "stop" })
 }
 
+export async function deleteWorkspace(id: string): Promise<void> {
+  await coderJson("POST", `/api/v2/workspaces/${id}/builds`, { transition: "delete" })
+}
+
 export async function countRunningWorkspaces(): Promise<number> {
-  const { workspaces } = await coderJson<{ workspaces: WorkspacePayload[] }>("GET", "/api/v2/workspaces")
-  return workspaces.filter(
-    ({ latest_build: build }) => build.transition === "start" && !ENDED_BUILD_STATUSES.has(build.status),
-  ).length
+  return (await listWorkspaces()).filter((workspace) => workspace.status === "running").length
+}
+
+export async function findUserByEmail(email: string): Promise<string | undefined> {
+  const { users } = await coderJson<{ users: { username: string; email: string }[] }>(
+    "GET",
+    `/api/v2/users?q=${encodeURIComponent(email)}`,
+  )
+  return users.find((user) => user.email.toLowerCase() === email.toLowerCase())?.username
 }

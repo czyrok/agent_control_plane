@@ -16,6 +16,7 @@ const BRANCH_PREFIXES: Record<string, string> = {
 }
 const DEFAULT_BRANCH_PREFIX = "feat"
 const REPOSITORY_LABEL_PREFIX = "repository/"
+const UNBATCHABLE_STATES = new Set(["finished", "needs_review", "merged", "cancelled"])
 
 export type Scope = "research" | "spec"
 
@@ -45,6 +46,12 @@ export async function stateIdByKey(key: string): Promise<string> {
 export async function stateGroup(stateId: string): Promise<string | undefined> {
   const { states } = await loadCatalog()
   return states.find((state) => state.id === stateId)?.group
+}
+
+export async function isBatchable(item: WorkItem): Promise<boolean> {
+  const { states } = await loadCatalog()
+  const externalId = states.find((state) => state.id === item.stateId)?.externalId
+  return !UNBATCHABLE_STATES.has(externalId ?? "")
 }
 
 export async function stateName(stateId: string): Promise<string | undefined> {
