@@ -26,6 +26,11 @@ async function blockersDone(item: WorkItem, itemsById: Map<string, WorkItem>): P
   return true
 }
 
+function hasLiveWorkspace(item: WorkItem): boolean {
+  const link = workItemWorkspaceRepository.findByItemId(item.id)
+  return link !== undefined && link.deletedAt === null
+}
+
 async function start(item: WorkItem, agent: string, itemsById: Map<string, WorkItem>): Promise<void> {
   const name = item.key.toLowerCase()
   const prefix = await planeProjectService.branchPrefixOf(item)
@@ -37,6 +42,7 @@ async function start(item: WorkItem, agent: string, itemsById: Map<string, WorkI
     agent,
     feature: buildPrompt(item, await planeProjectService.scopeOf(item)),
   })
+  const inProgress = await planeProjectService.stateIdByKey("in_progress")
   workItemWorkspaceRepository.insert({
     itemId: item.id,
     itemKey: item.key,
@@ -45,13 +51,15 @@ async function start(item: WorkItem, agent: string, itemsById: Map<string, WorkI
     workspaceId: workspace.id,
     createdAt: new Date().toISOString(),
     stoppedAt: null,
+    syncedStateId: inProgress,
+    deletedAt: null,
   })
   await planeWorkItemRepository.addLink(
     item.id,
     `${env("CODER_PUBLIC_URL")}/@${workspace.ownerName}/${workspace.name}`,
     "Coder workspace",
   )
-  await planeWorkItemRepository.setState(item.id, await planeProjectService.stateIdByKey("in_progress"))
+  await planeWorkItemRepository.setState(item.id, inProgress)
 }
 
 export async function startReadyWorkItems(items: WorkItem[]): Promise<void> {
@@ -61,7 +69,7 @@ export async function startReadyWorkItems(items: WorkItem[]): Promise<void> {
   const todo = await planeProjectService.stateIdByKey("todo")
   const itemsById = new Map(items.map((item) => [item.id, item]))
   const candidates = items
-    .filter((item) => item.stateId === todo && !workItemWorkspaceRepository.findByItemId(item.id))
+    .filter((item) => item.stateId === todo && !hasLiveWorkspace(item))
     .sort((left, right) => left.sequenceId - right.sequenceId)
 
   for (const item of candidates) {

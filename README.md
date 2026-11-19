@@ -1,9 +1,9 @@
 # agent_control_plane
 
 Syncs Plane work items with Coder agent workspaces: starts a workspace for
-each ready item, writes the link back, stops it once the item is closed, and
-serves the agent's Plane tools and questions to the operator over MCP. It is
-the only service holding a Plane API key.
+each ready item, writes the link back, keeps it in step with the item's
+state, and serves the agent's Plane tools and questions to the operator over
+MCP. It is the only service holding a Plane API key.
 
 ## Sync
 
@@ -20,9 +20,18 @@ Every 30 s it reads the project's work items and:
 - adds a "Coder workspace" link on the item and moves it to **In Progress**;
 - moves an item from **Waiting** back to **In Progress** on the first comment
   not posted by this service after a question;
-- stops the workspace of an item moved to **Merged** or **Cancelled**, or
-  deleted. **Finished** and **Needs Review** keep it running for review
-  feedback.
+- acts on a linked item only when its state changed since the last tick:
+
+  | New state | Workspace |
+  | --- | --- |
+  | **In Progress**, **Waiting**, **Finished**, **Needs Review** | started if stopped |
+  | **Todo** | started if stopped, item moved to **In Progress** |
+  | **Backlog** | stopped |
+  | **Merged**, **Cancelled**, or item deleted | open descendants moved to the same state, workspace deleted |
+
+  A workspace stopped by hand stays stopped until the state changes. A
+  deleted item's workspace is gone with its home volume; moving the item
+  back to **Todo** starts a new one.
 
 States and labels are found by the `external_id` Plane provisioning stamps
 on them (`todo`, `waiting`, `agent/claude_code`, `issue_type/spec`,

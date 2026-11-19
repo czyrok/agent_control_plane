@@ -30,3 +30,13 @@ if (!questionColumns.some((column) => column.name === "delivered_at")) {
     "ALTER TABLE questions ADD COLUMN delivered_at TEXT; UPDATE questions SET delivered_at = answered_at WHERE answer IS NOT NULL",
   )
 }
+
+const linkColumns = new Set(
+  (database.prepare("PRAGMA table_info(work_item_workspaces)").all() as { name: string }[]).map((column) => column.name),
+)
+for (const [column, definition] of [
+  ["synced_state_id", "TEXT"],
+  ["deleted_at", "TEXT"],
+]) {
+  if (!linkColumns.has(column)) database.exec(`ALTER TABLE work_item_workspaces ADD COLUMN ${column} ${definition}`)
+}

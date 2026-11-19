@@ -23,6 +23,8 @@ export type WorkItemWorkspace = {
   workspaceId: string
   createdAt: string
   stoppedAt: string | null
+  syncedStateId: string | null
+  deletedAt: string | null
 }
 
 export type Question = {

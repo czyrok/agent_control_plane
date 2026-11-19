@@ -85,6 +85,18 @@ export async function listWorkItems(): Promise<WorkItem[]> {
   }))
 }
 
+export function descendantsOf(itemId: string, items: WorkItem[]): WorkItem[] {
+  const found: WorkItem[] = []
+  const visited = new Set([itemId])
+  for (let level = [itemId]; level.length > 0; ) {
+    const children = items.filter((item) => item.parentId !== null && level.includes(item.parentId) && !visited.has(item.id))
+    for (const child of children) visited.add(child.id)
+    found.push(...children)
+    level = children.map((child) => child.id)
+  }
+  return found
+}
+
 export async function listStates(): Promise<PlaneState[]> {
   const states = await paginate<{ id: string; name: string; group: string } & ExternalPayload>(
     `${await projectPath()}/states/`,

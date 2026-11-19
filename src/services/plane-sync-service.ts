@@ -2,7 +2,7 @@ import { planeEnabled, PlaneRateLimitedError } from "../infrastructure/plane.ts"
 import { listWorkItems } from "../repositories/plane-work-item-repository.ts"
 import { syncQuestionAnswers } from "../use-cases/questions.ts"
 import { startReadyWorkItems } from "../use-cases/start-ready-work-items.ts"
-import { stopClosedWorkspaces } from "../use-cases/stop-closed-workspaces.ts"
+import { syncWorkItemStates } from "../use-cases/sync-work-item-states.ts"
 
 const INTERVAL_MILLISECONDS = 30_000
 
@@ -14,7 +14,7 @@ async function tick(): Promise<void> {
   try {
     const items = await listWorkItems()
     await syncQuestionAnswers()
-    await stopClosedWorkspaces(items)
+    await syncWorkItemStates(items)
     await startReadyWorkItems(items)
   } catch (error) {
     if (!(error instanceof PlaneRateLimitedError)) console.error("plane sync:", error)
